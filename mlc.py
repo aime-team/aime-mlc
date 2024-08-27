@@ -10,6 +10,7 @@ import sys
 import os
 import subprocess
 import argparse
+import pwd
 
 import csv
 import re
@@ -105,8 +106,9 @@ def get_flags():
     
    # If no command is provided, prompt the user to choose one
     while not args.command:
+        # ToDo: use the same method: 1) create, 2) open.... instead of a list of the actions
         print(f"{GREEN}Available commands:{RESET} " + ', '.join(available_commands))
-        chosen_command = input("Please choose a command: ").strip()
+        chosen_command = input(f"{CYAN}Please choose a command:{RESET} ").strip()
         if chosen_command in available_commands:
             # Re-parse arguments with the chosen command
             sys.argv.insert(1, chosen_command)
@@ -159,7 +161,7 @@ def extract_from_ml_images(filename, filter_cuda_architecture=None):
 
     return frameworks_dict, framework_list #, version_list
 
-def get_container_name(container_name):
+def get_container_name(container_name, user_name):
     """
     
     Args:0
@@ -167,11 +169,17 @@ def get_container_name(container_name):
     Return:
     
     """
+    # List existing containers
+    available_user_containers, _ = existing_user_containers(user_name)  
+    
     if container_name is not None:
         return validate_container_name(container_name)
     else:
-        while True:
+        while True:                           
             container_name = input(f"{CYAN}Enter a container name: {RESET}")
+            if container_name in available_user_containers:
+                print(f'Provided container name [{container_name}] already exists. Provide a new container name')
+                continue
             try:
                 return validate_container_name(container_name)
             except ValueError as e:
@@ -223,10 +231,11 @@ def get_user_selection(prompt, max_value):
             if 1 <= selection <= max_value:
                 return selection
             else:
-                print(f"Please enter a number between 1 and {max_value}.")
+                print(f"{RED}Please enter a number between 1 and {max_value}.{RESET}")
         except ValueError:
             print("Invalid input. Please enter a valid number.")
-
+# ToDo: actually not needed this function (only 1 line). Try to embed the list comprenhension within the code (OK)
+'''
 def get_versions(versions):
     """
     
@@ -238,7 +247,7 @@ def get_versions(versions):
     available_versions = [version[0] for version in versions]
     
     return available_versions
-
+'''
 def display_versions(framework, versions):
     """
     
@@ -251,7 +260,7 @@ def display_versions(framework, versions):
     for i, (version, _) in enumerate(versions, start=1):
         print(f"{i}) {version}")
 
-
+# ToDo: subtitute this function for the other one (see below), which uses command
 def check_container_exists(name):
     """
     
@@ -277,7 +286,167 @@ def get_docker_image(version, versions_images):
             return tup[1]
     # Raise an exception if no matching tuple is found              
     raise ValueError("No version available") 
+
+###############################################OPEN########################################################
+def run_docker_command(docker_command):
+    """
+    Run a shell command and return its output.
+    Args:
     
+    Return:
+    
+    """     
+    result = subprocess.run(
+        docker_command, 
+        shell=True, 
+        text=True, 
+        stdout=subprocess.PIPE, 
+        stderr=subprocess.PIPE)
+    return result.stdout.strip(), result.stderr.strip(), result.returncode
+
+def run_docker_command1(command):
+    process = subprocess.Popen(
+        command, 
+        shell=False,
+        text=True,
+        #stdin=subprocess.PIPE, 
+        #stdin=None, 
+        #stdout=subprocess.PIPE, 
+        stderr=subprocess.PIPE,
+    )
+    #stdout, stderr = process.communicate()  # Communicate handles interactive input/output
+    stderr = process.communicate()  # Communicate handles interactive input/output
+    return stderr, process.returncode
+
+    #return stdout.strip(), stderr.strip(), process.returncode
+
+
+
+'''
+process = subprocess.Popen(
+    command, 
+    shell=False,
+    stdin=subprocess.PIPE, 
+    #stdin=None, 
+    stdout=subprocess.PIPE, 
+    stderr=subprocess.PIPE,
+    text=True
+)
+while True:
+    user_input = input()
+    stdout, stderr = process.communicate(input=user_input)  # Communicate handles interactive input/output
+
+def run_docker_command1(docker_command):
+    """
+    Run a shell command and return its output.
+    Args:
+    
+    Return:
+    
+    """ 
+    
+    result = subprocess.run(docker_command, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    return result.stdout.strip(), result.stderr.strip(), result.returncode
+'''
+
+def check_container_exists(container_name):
+    """
+    Check if the container exists.
+    Args:
+    
+    Return:  
+    
+    
+    """
+    docker_command = f'docker container ps -a --filter=name=^/{container_name}$ --filter=label=aime.mlc --format "{{{{.Names}}}}"'
+    output, _, _ = run_docker_command(docker_command)
+    return output
+#####-------------------------------
+def existing_user_containers(user_name):
+    """
+    Provide a list of existing containers created previously by the current user
+    Args:
+    
+    Return:      
+    
+    """
+    # List all containers with the 'aime.mlc' label owned by the current user
+    docker_command = f"docker container ps -a --filter=label=aime.mlc.USER={user_name} --format '{{{{.Names}}}}'"
+    output, _,_ = run_docker_command(docker_command)
+    container_tags = output.splitlines()
+    #print(f"Container_tags: {container_tags}")
+    # check that at least 1 container has been created previously
+    if not container_tags:
+        print(f"{RED}Create at least one container. If not, mlc open does not work!!{RESET}")
+        exit(1)
+
+    # Extract base names from full container names
+    container_names = [re.match(r"^(.*?)\._\.\w+$", container).group(1) for container in container_tags]
+
+    return container_names, container_tags
+
+def print_existing_container_list(container_list):
+    """
+    Print an ordered list with the existing containers
+    Args:
+    
+    Return:  
+    
+    
+    """
+    for index, container in enumerate(container_list, start=1):
+        print(f"{index}) {container}")
+# ToDo: similar to get_user_selection(prompt, max_value). If possible combine both functions
+def select_container(container_list):
+    """
+    Prompts the user to select a container from the list.
+    Args:
+    
+    Return:      
+    """
+    while True:
+        try:
+            selection = int(input(f"{CYAN}Select the number of the container to be opened:{RESET}"))
+            container_list_length = len(container_list)
+            if 1 <= selection <= container_list_length:
+                return container_list[selection - 1], selection
+            else:
+                print(f"{RED}Invalid selection. Please choose a valid number.{RESET}")
+        except ValueError:
+            print(f"{RED}Invalid input. Please enter a number.{RESET}")
+            
+def check_container_running(container_name):
+    """
+    Check if the container is running.
+    
+    Args:
+    
+    Return:
+    
+    """
+    docker_command = f'docker container ps --filter=name=^/{container_name}$ --filter=label=aime.mlc --format "{{{{.Names}}}}"'
+    output, _, _ = run_docker_command(docker_command)
+    return output
+
+def is_container_active(container_name):
+    """
+    Check if the container is active by inspecting its processes.
+    
+    Args:
+        
+    Return:
+    
+    """
+    docker_command = f'docker top {container_name} -o pid'
+    output, _, exit_code = run_docker_command(docker_command)
+    process_count = len(output.splitlines())
+    if exit_code == 0 and 2 < process_count:
+        return "True"
+    else:
+        return "False"
+###############################################STOP#########################################
+
+
 
 ###############################################################################################################
     
@@ -308,223 +477,329 @@ def main():
     framework_version_docker, frameworks = extract_from_ml_images(repo_file, filter_cuda_architecture)
     #print(f"ML_REPO: {framework_version_docker}") #DEBUGGING
     
-    # Obtain user and group id for different tasks by create, open,...
+    # Obtain user and group id, user name for different tasks by create, open,...
     user_id = os.getuid()
+    #user_name = subprocess.getoutput("id -un")
+    user_name = pwd.getpwuid(os.getuid()).pw_name
     group_id = os.getgid()        
     
-    if args.command == 'create':
-   
-        if args.container_name is None and args.framework is None and args.version is None:
-            print(
-                "\n" +\
-                f"{GREEN}Info{RESET}: \
-                \nCreate a new machine learning container. \
-                \n{GREEN}Correct Usage{RESET}: \
-                \n<container_name> <framework_name> <framework_version> -w /home/$USER/workspace -d /data -ng 1 \
-                \n{GREEN}Example{RESET}: \
-                \npt231aime Pytorch 2.3.1-aime\n"
-            )
+    try: 
+        if args.command == 'create':
+    
+            if args.container_name is None and args.framework is None and args.version is None:
+                print(
+                    "\n" +\
+                    f"{GREEN}Info{RESET}: \
+                    \nCreate a new machine learning container. \
+                    \n{GREEN}Correct Usage{RESET}: \
+                    \n<container_name> <framework_name> <framework_version> -w /home/$USER/workspace -d /data -ng 1 \
+                    \n{GREEN}Example{RESET}: \
+                    \nmlc create pt231aime Pytorch 2.3.1-aime\n"
+                )
 
-        # User provides the container name
-        validated_container_name = get_container_name(args.container_name)
-        
-        # ToDo (check if the container_name exist due to an existing container, no check container_tag but container_name):
-        #while validated_container_name exist:
-        #    user_container_name = input("The provided container name alread exist: Please, introduce a new container name:")
-        
-        # Framework part:
-        if args.framework is None:            
-            while args.framework is None:
-                framework_list = display_frameworks(framework_version_docker)
-                framework_num = get_user_selection(f"{CYAN}Enter the number of your framework: {RESET}", len(framework_list))
-                args.framework = framework_list[framework_num - 1]
-        else:    
-            available_frameworks = list(framework_version_docker.keys())
-            while True:
-                if args.framework in available_frameworks:
-                    break
-                else:
-                    framework_list = display_frameworks(framework_version_docker)
-                    framework_number = get_user_selection(f"{CYAN}Enter the number of your framework: {RESET}", len(framework_list))
-                    args.framework = framework_list[framework_number - 1]
-                    #print(f"Available frameworks: {', '.join(available_frameworks)}")
-                    #selected_framework = input(f"{CYAN}Please select a valid framework: {RESET}")
-             
-        selected_framework = args.framework
+            # User provides the container name and be validated
+            validated_container_name = get_container_name(args.container_name, user_name)
             
-        # Version part
-        versions_images = framework_version_docker[selected_framework]
-        #print(f"Versions and docker images: {versions_images}")
-        if args.version is None:
-            while args.version is None:  
-                #version_list = framework_version_docker[selected_framework]
-                display_versions(selected_framework, versions_images)
-                version_number = get_user_selection(f"{CYAN}Enter the number of your version: {RESET}", len(versions_images))
-                # Version and docker image selected
-                args.version, selected_docker_image = versions_images[version_number - 1]
-        else:
-            available_versions = get_versions(versions_images)
-            #print(f"{available_versions}")
-            #print(f"I am here")
-            while True:
-                if args.version in available_versions:
-                    selected_docker_image = get_docker_image(args.version, versions_images)
-                    break
-                else:
+            # Framework part:
+            if args.framework is None:            
+                while args.framework is None:
+                    framework_list = display_frameworks(framework_version_docker)
+                    framework_num = get_user_selection(f"{CYAN}Enter the number of your framework: {RESET}", len(framework_list))
+                    args.framework = framework_list[framework_num - 1]
+            else:    
+                available_frameworks = list(framework_version_docker.keys())
+                while True:
+                    if args.framework in available_frameworks:
+                        break
+                    else:
+                        framework_list = display_frameworks(framework_version_docker)
+                        framework_number = get_user_selection(f"{CYAN}Enter the number of your framework: {RESET}", len(framework_list))
+                        args.framework = framework_list[framework_number - 1]
+                        #print(f"Available frameworks: {', '.join(available_frameworks)}")
+                        #selected_framework = input(f"{CYAN}Please select a valid framework: {RESET}")
+                
+            selected_framework = args.framework
+                
+            # Version part
+            versions_images = framework_version_docker[selected_framework]
+            #print(f"Versions and docker images: {versions_images}")
+            if args.version is None:
+                while args.version is None:  
+                    #version_list = framework_version_docker[selected_framework]
                     display_versions(selected_framework, versions_images)
                     version_number = get_user_selection(f"{CYAN}Enter the number of your version: {RESET}", len(versions_images))
                     # Version and docker image selected
                     args.version, selected_docker_image = versions_images[version_number - 1]
-        
-        selected_version = args.version
-         
-        print(f"\nYou have selected: {ORANGE2}{selected_framework} {selected_version}{RESET}")
-        print(f"The mlc container called {ORANGE2}{validated_container_name}{RESET} with the framework {ORANGE2}{selected_framework}{RESET} and version {ORANGE2}{selected_version}{RESET} with docker image {selected_docker_image} will be created!!")
-        
-        # Check if the provided workspace directory exist:
-        if os.path.isdir(args.workspace_dir):
-            print(f"\n/workspace will mount on '{args.workspace_dir}' - OK")
-        else:
-            print(f"\nAborted.\n\nWorkspace directory not existing: {args.workspace_dir}")
-            print("\nThe workspace directory will be mounted as /workspace in the container.")
-            print("It is the directory where your project data should be stored to be accessed\ninside the container.")
-            print("\nIt can be set to an existing directory with the option '-w=/your/workspace'\n")
-            sys.exit(-4)
-        
-        # Check if the provided data directory exist:
-        if args.data_dir:
-            data_mount = os.path.realpath(args.data_dir)
-            if os.path.isdir(data_mount):
-                print(f"/data will mount on '{data_mount}' - OK")
             else:
-                print(f"\nAborted.\n\nData directory not existing: {data_mount}")
-                print("\nThe data directory will be mounted as /data in the container.")
-                print("It is the directory where data sets for example mounted from\nnetwork volumes can be accessed inside the container.")
-                sys.exit(-4)
-        
-        #############################################DOCKER TASKS START######################################################################
-        # Generate a unique container tag
-        container_tag = f"{validated_container_name}._.{user_id}"
-        
-        #print(container_tag)
-        
-        # Check if a container with the generated tag already exists
-        if container_tag == check_container_exists(container_tag):
-            print(f"\n{RED}Error:{RESET} \nContainer [{ORANGE2}{validated_container_name}{RESET}] already exists.")
-            sys.exit(-1)
-        else:
-            print(f"{validated_container_name} will be created!!!")
-
-        # Pulling the required image from aime-hub: 
-        print("\nAcquiring container image ... \n")        
-        subprocess.run(['docker', 'pull', selected_docker_image])
-    
-        print("\nSetting up container ... \n")
-        
-        # Adding 
-        container_label = "aime.mlc"
-        workspace = "/workspace"
-        data = "/data"
-        
-        # Run the Docker Container: Starts a new container, installs necessary packages, 
-        # and sets up the environment.
-        #print("docker_run_cmd will be created")
-        docker_run_cmd = [
+                available_versions = [version[0] for version in versions_images]
+                #available_versions = get_versions(versions_images)
+                #print(f"{available_versions}")
+                #print(f"I am here")
+                while True:
+                    if args.version in available_versions:
+                        selected_docker_image = get_docker_image(args.version, versions_images)
+                        break
+                    else:
+                        display_versions(selected_framework, versions_images)
+                        version_number = get_user_selection(f"{CYAN}Enter the number of your version: {RESET}", len(versions_images))
+                        # Version and docker image selected
+                        args.version, selected_docker_image = versions_images[version_number - 1]
             
-            'docker', 'run', '-v', f'{args.workspace_dir}:{workspace}', '-w', workspace,
-            '--name', container_tag, '--tty', '--privileged', '--gpus', args.num_gpus,
-            '--network', 'host', 
-            '--device', '/dev/video0', 
-            '--device', '/dev/snd',
-            '--ipc', 'host', 
-            '--ulimit', 'memlock=-1', 
-            '--ulimit', 'stack=67108864',
-            '-v', '/tmp/.X11-unix:/tmp/.X11-unix', 
-            selected_docker_image, 
-            'bash', '-c',
-            f'echo "export PS1=\'[{validated_container_name}] `whoami`@`hostname`:${{PWD#*}}$ \'" >> ~/.bashrc; '
-            f'apt-get update -y > /dev/null; apt-get install sudo git -q -y > /dev/null; '
-            f'addgroup --gid {group_id} {os.getlogin()} > /dev/null; '
-            f'adduser --uid {user_id} --gid {group_id} {os.getlogin()} --disabled-password --gecos aime > /dev/null; '
-            f'passwd -d {os.getlogin()}; echo "{os.getlogin()} ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/{os.getlogin()}_no_password; '
-            f'chmod 440 /etc/sudoers.d/{os.getlogin()}_no_password; exit'
-        ]
-        #print("subprocess docker_run_cmd will starten")        
-        result_run_cmd = subprocess.run(docker_run_cmd, capture_output=True, text=True )
-        #print(f"STDOUT run_cmd: {result_run_cmd.stdout}")
-        #print(f"STDERR run_cmd: {result_run_cmd.stderr}")
-        
-        #print("subprocess docker_run_cmd finished")
+            selected_version = args.version
+            
+            print(f"\nYou have selected: {ORANGE2}{selected_framework} {selected_version}{RESET}")
+            print(f"The mlc container called {ORANGE2}{validated_container_name}{RESET} with the framework {ORANGE2}{selected_framework}{RESET} and version {ORANGE2}{selected_version}{RESET} with docker image {selected_docker_image} will be created!!")
+            
+            # Check if the provided workspace directory exist:
+            if os.path.isdir(args.workspace_dir):
+                print(f"\n/workspace will mount on '{args.workspace_dir}' - OK")
+            else:
+                print(f"\nAborted.\n\nWorkspace directory not existing: {args.workspace_dir}")
+                print("\nThe workspace directory will be mounted as /workspace in the container.")
+                print("It is the directory where your project data should be stored to be accessed\ninside the container.")
+                print("\nIt can be set to an existing directory with the option '-w=/your/workspace'\n")
+                sys.exit(-4)
+            
+            # Check if the provided data directory exist:
+            if args.data_dir:
+                data_mount = os.path.realpath(args.data_dir)
+                if os.path.isdir(data_mount):
+                    print(f"/data will mount on '{data_mount}' - OK")
+                else:
+                    print(f"\nAborted.\n\nData directory not existing: {data_mount}")
+                    print("\nThe data directory will be mounted as /data in the container.")
+                    print("It is the directory where data sets for example mounted from\nnetwork volumes can be accessed inside the container.")
+                    sys.exit(-4)
+            
+            #############################################DOCKER TASKS START######################################################################
+            # Generate a unique container tag
+            container_tag = f"{validated_container_name}._.{user_id}"
+            
+            #print(container_tag)
+            
+            # Check if a container with the generated tag already exists
+            if container_tag == check_container_exists(container_tag):
+                print(f"\n{RED}Error:{RESET} \nContainer [{ORANGE2}{validated_container_name}{RESET}] already exists.")
+                sys.exit(-1)
+            else:
+                print(f"{validated_container_name} will be created!!!")
 
-        # Commit the Container: Saves the current state of the container as a new image.
-        result_commit = subprocess.run(['docker', 'commit', container_tag, f'{selected_docker_image}:{container_tag}'], capture_output=True, text=True)#, stdout = subprocess.DEVNULL, stderr =subprocess.DEVNULL)
-        #print(f"STDOUT commit: {result_commit.stdout}")
-        #print(f"STDERR commit: {result_commit.stderr}")
+            # Pulling the required image from aime-hub: 
+            print("\nAcquiring container image ... \n")        
+            subprocess.run(['docker', 'pull', selected_docker_image])
         
-        # ToDo: capture possible errors and treat them  
-        #print("subprocess commit finished")
+            print("\nSetting up container ... \n")
+            
+            # Adding 
+            container_label = "aime.mlc"
+            workspace = "/workspace"
+            data = "/data"
+            
+            # Run the Docker Container: Starts a new container, installs necessary packages, 
+            # and sets up the environment.
+            #print("docker_run_cmd will be created")
+            docker_run_cmd = [
+                
+                'docker', 'run', '-v', f'{args.workspace_dir}:{workspace}', '-w', workspace,
+                '--name', container_tag, '--tty', '--privileged', '--gpus', args.num_gpus,
+                '--network', 'host', 
+                '--device', '/dev/video0', 
+                '--device', '/dev/snd',
+                '--ipc', 'host', 
+                '--ulimit', 'memlock=-1', 
+                '--ulimit', 'stack=67108864',
+                '-v', '/tmp/.X11-unix:/tmp/.X11-unix', 
+                selected_docker_image, 
+                'bash', '-c',
+                f'echo "export PS1=\'[{validated_container_name}] `whoami`@`hostname`:${{PWD#*}}$ \'" >> ~/.bashrc; '
+                f'apt-get update -y > /dev/null; apt-get install sudo git -q -y > /dev/null; '
+                f'addgroup --gid {group_id} {os.getlogin()} > /dev/null; '
+                f'adduser --uid {user_id} --gid {group_id} {os.getlogin()} --disabled-password --gecos aime > /dev/null; '
+                f'passwd -d {os.getlogin()}; echo "{os.getlogin()} ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/{os.getlogin()}_no_password; '
+                f'chmod 440 /etc/sudoers.d/{os.getlogin()}_no_password; exit'
+            ]
+            #print("subprocess docker_run_cmd will starten")        
+            result_run_cmd = subprocess.run(docker_run_cmd, capture_output=True, text=True )
+            #print(f"STDOUT run_cmd: {result_run_cmd.stdout}")
+            #print(f"STDERR run_cmd: {result_run_cmd.stderr}")
+            
+            #print("subprocess docker_run_cmd finished")
 
-        # Remove the Container: Cleans up the initial container to free up resources.
-        result_remove = subprocess.run(['docker', 'rm', container_tag], capture_output=True, text=True)
-        #print(f"STDOUT remove: {result_remove.stdout}")
-        #print(f"STDERR remove: {result_remove.stderr}")
-        #print("subprocess rm finished")
+            # Commit the Container: Saves the current state of the container as a new image.
+            result_commit = subprocess.run(['docker', 'commit', container_tag, f'{selected_docker_image}:{container_tag}'], capture_output=True, text=True)#, stdout = subprocess.DEVNULL, stderr =subprocess.DEVNULL)
+            #print(f"STDOUT commit: {result_commit.stdout}")
+            #print(f"STDERR commit: {result_commit.stderr}")
+            
+            # ToDo: capture possible errors and treat them  
+            #print("subprocess commit finished")
 
-        # Create but not run the final Docker container with labels and user configurations and setting up volume mounts
-        #volumes = f'-v {args.workspace_dir}:{workspace}'
-        ''' OLD STUFF
-        args.data_dir = '/data'
-        volumes = ' \'-v\',' + f' {args.workspace_dir}:{workspace}'
-        #volumes = '-v' + f'{args.workspace_dir}:{workspace}'
-        if args.data_dir:
-            volumes += ',' + '\'-v\','+ f' {args.data_dir}:{data}'
-            #volumes += f'-v {args.data_dir}:{data}'
-        print("subprocess commit finished")
-        print(f"volumes: {volumes}")
-        '''    
-        volumes = ['-v', f'{args.workspace_dir}:{workspace}'] 
-        # Add the data volume mapping if args.data_dir is set
-        if args.data_dir:
-            #volumes.extend(['-v', f'{args.data_dir}:{data}'])
-            volumes +=  ['-v', f'{args.data_dir}:{data}']
+            # Remove the Container: Cleans up the initial container to free up resources.
+            result_remove = subprocess.run(['docker', 'rm', container_tag], capture_output=True, text=True)
+            #print(f"STDOUT remove: {result_remove.stdout}")
+            #print(f"STDERR remove: {result_remove.stderr}")
+            #print("subprocess rm finished")
+
+            # Create but not run the final Docker container with labels and user configurations and setting up volume mounts
+            #volumes = f'-v {args.workspace_dir}:{workspace}'
+            ''' OLD STUFF
+            args.data_dir = '/data'
+            volumes = ' \'-v\',' + f' {args.workspace_dir}:{workspace}'
+            #volumes = '-v' + f'{args.workspace_dir}:{workspace}'
+            if args.data_dir:
+                volumes += ',' + '\'-v\','+ f' {args.data_dir}:{data}'
+                #volumes += f'-v {args.data_dir}:{data}'
+            print("subprocess commit finished")
+            print(f"volumes: {volumes}")
+            '''    
+            volumes = ['-v', f'{args.workspace_dir}:{workspace}'] 
+            # Add the data volume mapping if args.data_dir is set
+            if args.data_dir:
+                #volumes.extend(['-v', f'{args.data_dir}:{data}'])
+                volumes +=  ['-v', f'{args.data_dir}:{data}']
+            
+            docker_create_cmd = [
+            'docker', 'create', '-it', '-w', workspace, '--name', container_tag,
+            '--label', f'{container_label}={os.getlogin()}', '--label', f'{container_label}.NAME={validated_container_name}',
+            '--label', f'{container_label}.USER={os.getlogin()}', '--label', f'{container_label}.VERSION={mlc_version}',
+            '--label', f'{container_label}.WORK_MOUNT={args.workspace_dir}', '--label', f'{container_label}.DATA_MOUNT={args.data_dir}',
+            '--label', f'{container_label}.FRAMEWORK={selected_framework}-{selected_version}', '--label', f'{container_label}.GPUS={args.num_gpus}',
+            '--user', f'{user_id}:{group_id}', '--tty', '--privileged', '--interactive', '--gpus', args.num_gpus,
+            '--network', 'host', '--device', '/dev/video0', '--device', '/dev/snd', '--ipc', 'host',
+            '--ulimit', 'memlock=-1', '--ulimit', 'stack=67108864', '-v', '/tmp/.X11-unix:/tmp/.X11-unix', 
+            '--group-add', 'video', '--group-add', 'sudo', f'{selected_docker_image}:{container_tag}', 'bash', '-c',
+            f'echo "export PS1=\'[{validated_container_name}] `whoami`@`hostname`:${{PWD#*}}$ \'" >> ~/.bashrc; bash'
+            ]
+            # Insert the volumes list at the correct position, after '-it'
+            docker_create_cmd[3:3] = volumes
+            
+            #print(f"{docker_create_cmd}")
+            #print("docker_create_cmd finished")
+
+            result_create_cmd = subprocess.run(docker_create_cmd, capture_output= True, text=True)
+            #print(f"STDOUT create_cmd: {result_create_cmd.stdout}")
+            #print(f"STDERR create_cmd: {result_create_cmd.stderr}")
+            
+            print(f"\n[{validated_container_name}] ready. Open the container with: mlc open {validated_container_name}\n")
         
-        docker_create_cmd = [
-        'docker', 'create', '-it', '-w', workspace, '--name', container_tag,
-        '--label', f'{container_label}={os.getlogin()}', '--label', f'{container_label}.NAME={validated_container_name}',
-        '--label', f'{container_label}.USER={os.getlogin()}', '--label', f'{container_label}.VERSION={mlc_version}',
-        '--label', f'{container_label}.WORK_MOUNT={args.workspace_dir}', '--label', f'{container_label}.DATA_MOUNT={args.data_dir}',
-        '--label', f'{container_label}.FRAMEWORK={selected_framework}-{selected_version}', '--label', f'{container_label}.GPUS={args.num_gpus}',
-        '--user', f'{user_id}:{group_id}', '--tty', '--privileged', '--interactive', '--gpus', args.num_gpus,
-        '--network', 'host', '--device', '/dev/video0', '--device', '/dev/snd', '--ipc', 'host',
-        '--ulimit', 'memlock=-1', '--ulimit', 'stack=67108864', '-v', '/tmp/.X11-unix:/tmp/.X11-unix', 
-        '--group-add', 'video', '--group-add', 'sudo', f'{selected_docker_image}:{container_tag}', 'bash', '-c',
-        f'echo "export PS1=\'[{validated_container_name}] `whoami`@`hostname`:${{PWD#*}}$ \'" >> ~/.bashrc; bash'
-        ]
-        # Insert the volumes list at the correct position, after '-it'
-        docker_create_cmd[3:3] = volumes
-        
-    #print(f"{docker_create_cmd}")
-    #print("docker_create_cmd finished")
+            # docker ps --format "{{.Label \"aime.mlc.NAME\"}}"
+           
+        if args.command == 'open':           
+            
+            # List existing containers of the current user
+            available_user_containers, available_user_container_tags = existing_user_containers(user_name)
+            
+            if args.container_name:     
+                if args.container_name not in available_user_containers:
+                    print(f"No containers found matching the name '{args.container_name}' for the current user.")
+                    # ToDo: create a function ( the same 4 lines as below)
+                    print(f"{GREEN}Available containers of the current user:{RESET}")
+                    print_existing_container_list(available_user_containers)
+                    selected_container_name, selected_container_position = select_container(available_user_containers)
+                    print(f"{GREEN}Selected container to be opened:{RESET} {selected_container_name}")                            
+                else:
+                    selected_container_name = args.container_name
+                    selected_container_position = available_user_containers.index(args.container_name) + 1
+                    print(f'Provided container name [{args.container_name}] exists and will be opened.')                   
+            else:        
+                print(
+                    "\n" +\
+                    f"{GREEN}Info{RESET}: \
+                    \nOpen an existing machine learning container. \
+                    \n{GREEN}Correct Usage{RESET}: \
+                    \nmlc open <container_name>\
+                    \n{GREEN}Example{RESET}: \
+                    \nmlc open pt231aime\n"
+                )
+                # ToDo: create a function ( the same 4 lines as above)
+                print(f"{GREEN}Available containers of the current user:{RESET}")
+                print_existing_container_list(available_user_containers)
+                selected_container_name, selected_container_position = select_container(available_user_containers)
+                print(f"{GREEN}Selected container to be opened:{RESET} {selected_container_name}")
+            
+            # Obtain container_tag from the selected container name
+            selected_container_tag = available_user_container_tags[selected_container_position-1]
+            print(f"Container_tag: {selected_container_tag}")
+            
+            # Start the existing selected container:
+            if selected_container_tag != check_container_running(selected_container_tag):
+                print(f"[{selected_container_name}] starting container")
+                docker_command = f"docker container start {selected_container_tag}"
+                _, _, _ = run_docker_command(docker_command)
+            else:
+                print(f"[{selected_container_name}] container already running")
 
-    result_create_cmd = subprocess.run(docker_create_cmd, capture_output= True, text=True)
-    #print(f"STDOUT create_cmd: {result_create_cmd.stdout}")
-    #print(f"STDERR create_cmd: {result_create_cmd.stderr}")
+            print(f"[{selected_container_name}] opening shell to container")
+            
+            '''
+            # Set environment variables for Docker exec
+            set_env = ["-e", f"DISPLAY={subprocess.getoutput('echo $DISPLAY')}"]
     
-    print(f"\n[{validated_container_name}] ready. Open the container with: mlc open {validated_container_name}\n")
-       
-        
-    if args.command == 'open':
-        if not args.container_name:
-            print(
-                "\n" +\
-                f"{GREEN}Info{RESET}: \
-                \Open a created machine learning container. \
-                \n{GREEN}Correct Usage{RESET}: \
-                \nmlc open <container_name>\
-                \n{GREEN}Example{RESET}: \
-                \npt231aime\n"
+            # Check and add NCCL_P2P_LEVEL if it's set in the environment
+            nccl_p2p_level = subprocess.getoutput("echo $NCCL_P2P_LEVEL")
+            if nccl_p2p_level:
+                #set_env.extend(["-e", f"NCCL_P2P_LEVEL={nccl_p2p_level}"])
+                set_env.append(["-e", f"NCCL_P2P_LEVEL={nccl_p2p_level}"])
+
+
+            # Open an interactive shell in the running container
+            result = subprocess.Popen(
+                ["docker", "exec", "-it"] + set_env + ["--user", f"{user_id}:{group_id}", {selected_container_tag}, "/bin/bash"]
             )
-            args.container_name = input("Please provide a container name: ").strip()            
+            exit_code = result.returncode
+            '''
+                         
+            # Set environment variables to pass to the Docker container
+            set_env = f"-e DISPLAY={os.environ.get('DISPLAY')}"
+            
+            # If the NCCL_P2P_LEVEL environment variable is set, include it in the environment settings
+            if 'NCCL_P2P_LEVEL' in os.environ:
+                set_env += f" -e NCCL_P2P_LEVEL={os.environ.get('NCCL_P2P_LEVEL')}"   
+            print(f"SET_ENV value: {set_env}")
+            str(5)
+            "5"
+            # Open an interactive shell session in the running container as the current user
+            #docker_command = f"docker exec -it {set_env} --user {user_id}:{group_id} {selected_container_tag} /bin/bash"
+            #'''
+            docker_command=[
+                "docker", "exec", # Docker command
+                "-it",   # Flag i: interactive
+                         # Flag t: allocates a pseudo-TTY (terminal), allowing you to interact with the container.
+                set_env, # 
+                "--user", 
+                f"{user_id}:{group_id}",  # User and group IDs
+                f"{selected_container_tag}",  # Name of the container_tag
+                "bash"  # Command to execute inside the container
+            ]
+            #'''
+
+            print(f"Docker command: {docker_command}")
+            #_, error_mesage, exit_code = run_docker_command1(docker_command)
+
+            error_mesage, exit_code = run_docker_command1(docker_command)
+            # While the shell is open, the user can run commands, check the environment, or perform any other tasks inside the container.
+            # Python script is effectively paused at this point, waiting for the shell session to finish.
+            #print(f"stdout: {stdout}")
+            print(f'Error_mesage: {error_mesage}')
+            print(f"Exit code: {exit_code}")
+            # Now the user ends the session. How the shell session was terminated?
+            if exit_code == 1:
+                print(f"[{selected_container_name}] detached from container, container keeps running")
+            else:
+                print(f"[{selected_container_name}] container shell closed with exit code {exit_code}") 
+            
+            # Check the status of the opened container     
+            active_status = is_container_active(selected_container_tag)
+
+            if active_status == "True":
+                print(f"[{selected_container_name}] container is active, kept running.")
+            else:
+                print(f"[{selected_container_name}] container is inactive, stopping container ...")
+                docker_command = f"docker container stop {selected_container_tag}"
+                _, _, _ = run_docker_command(docker_command)
+                print(f"[{selected_container_name}] container stopped.\n")  
+            
+    except KeyboardInterrupt:
+        print(f"\n{RED}Running process cancelled by the user!!!{RESET}")
    
            
             
