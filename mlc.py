@@ -11,6 +11,7 @@ import os
 import subprocess
 import argparse
 import pwd
+import json
 
 import csv
 import re
@@ -21,6 +22,15 @@ import re
 supported_arch = "CUDA_ADA"     # Supported architecture for the container
 mlc_version=3                   # Version number of the machine learning container setup
 
+# Obtain user and group id, user name for different tasks by create, open,...
+user_id = os.getuid()
+#user_name = subprocess.getoutput("id -un")
+#user_name_pwd = pwd.getpwuid(user_id).pw_name
+#ToDo: compare both user_name
+user_name = os.getlogin()
+group_id = os.getgid()      
+#print(f"user_name_pwd: {user_name_pwd}")
+#print(f"user_name_login: {user_name}")
 
 # ANSI escape codes
 RED = "\033[91m"
@@ -74,8 +84,8 @@ def get_flags():
     
     # Parser for the "list" command
     parser_list = subparsers.add_parser('list', help='List of created ml-containers')
-    #parser_list.add_argument('container_name', nargs = '?', type=str, help='List of the created ml-container/s')
-    
+    parser_list.add_argument('-a', '--all', action = "store_true", help='List of the created ml-container/s by all users')
+
     # Parser for the "open" command
     parser_open = subparsers.add_parser('open', help='Open an existing container')
     parser_open.add_argument('container_name', nargs = '?', type=str, help='Name of the container/s to be opened')
@@ -91,7 +101,7 @@ def get_flags():
 
     # Parser for the "stats" command
     parser_stats = subparsers.add_parser('stats', help='Show the most important statistics of the running ml-containers')
-    #parser_stats.add_argument('container_name', nargs = '?', type=str, help='Show the most important statistics of the running ml-containers')
+    parser_stats.add_argument('-s', '--stream', action = "store_true", help='Show the streaming (live) statistics of the running ml-containers')
 
     # Parser for the "stop" command
     parser_stop = subparsers.add_parser('stop', help='Stop existing container/s')
@@ -520,6 +530,277 @@ def get_container_image(container_tag):
     output, _, _ = run_docker_command(docker_command_get_image)
     return output
 
+###############################################LIST#########################################
+
+# Define a function to format the container info
+def format_container_info(container_info_dict):
+    # Regular expression to capture the container_name, within the container_tag, located before ._. (example: containername._.1001)
+    #container_name_pattern = re.compile(r'^([a-zA-Z0-9]+)\._\d{4}$')  
+    #print(f"container_info_dict: {container_info_dict}")
+    #container_name_tag = container_info_dict['Names']
+    #print(f"container_name_tag: {container_name_tag}")
+    #user = container_info_dict.get('Labels', {}).get(f'aime.mlc.{user_name}', {})
+    # Extract the 'Labels' field
+    labels_string = container_info_dict.get('Labels', {})
+    # Split the labels string into key-value pairs
+    labels_dict = dict(pair.split('=', 1) for pair in labels_string.split(','))
+    #print(f"labels_dict: {labels_dict}")
+    # Retrieve the value for 'aime.mlc.USER'
+    container_name = labels_dict["aime.mlc.NAME"]
+    size = container_info_dict['Size']
+    user_name = labels_dict.get("aime.mlc.USER", "N/A")
+    framework = labels_dict["aime.mlc.FRAMEWORK"]
+    status = container_info_dict['Status']
+    
+    info_to_be_printed = [f"[{container_name}]", size, user_name, framework, status]
+
+    #print(f"info_to_be_printed: {info_to_be_printed}")
+    #output = "\t".join(info_to_be_printed)
+    #print(f"info_to_be_printed: {output}")
+    # Use regular expression to find the container name before ._.
+    #match = container_name_pattern.match(container_name_tag)
+    #container_name = match.group(1) if match else container_name_tag
+    #print(f"container_name: {container_name}")
+    # Format the output line
+    return info_to_be_printed #"_".join(info_to_be_printed)
+
+def show_container_info(args_all):
+    # Adapt the filter to the selected flags (no flag or --all)
+    filter_aime_mlc_user =  "label=aime.mlc" if args_all else f"label=aime.mlc={user_name}"
+    #ERROR: docker_command_ls = f"docker container ls -a --filter{filter_aime_mlc_user} --format {{json .}}'"
+    #print(f"filter_aime_mlc_user: {filter_aime_mlc_user}")
+    docker_command_ls = [
+        "docker", "container", 
+        "ls", 
+        "-a", 
+        "--filter", filter_aime_mlc_user, 
+        "--format", '{{json .}}'    
+    ]
+    #print(f"docker_command_ls: {docker_command_ls}")
+    # Initialize Popen to run the docker command with JSON output
+    process = subprocess.Popen(
+        docker_command_ls, 
+        shell=False,
+        text=True,
+        stdout=subprocess.PIPE,  # Capture stdout
+        stderr=subprocess.PIPE    # Capture stderr
+    )
+    
+    # Communicate with the process to get output and errors
+    stdout_data, stderr_data = process.communicate()        
+    stdout_data = str(stdout_data.strip())
+
+    # Check for any errors
+    if process.returncode != 0:
+        print(f"Error: {stderr_data}")
+    else:
+        # Split into individual lines and process them as JSON objects
+        output_lines = []
+        try:
+            # Split by newlines and parse each line as JSON
+            json_lines = stdout_data.split('\n') #list
+            #print(len(json_lines))
+            #print(f"type jsonlines[0]: {type(json_lines[0])}")
+            #print(f"jsonlines: {json_lines}")
+            containers_info = [json.loads(line) for line in json_lines if line]
+            #print(f"type containers_info[0]: {type(containers_info[0])}")
+            #print(f"containers_info: {containers_info}")
+            #print(len(containers_info))
+
+            # Apply formatting to all containers' info
+            output_lines = list(map(format_container_info, containers_info))
+        
+        except json.JSONDecodeError:
+            print("Failed to decode JSON output.")
+        except KeyError as e:
+            print(f"Missing expected key: {e}")
+    # Print the final processed output
+    # Define an output format string with specified widths
+    format_string = "{:<15}{:<30}{:<15}{:<30}{:<30}"
+    print(f"\n{GREEN}Available ml-containers are:{RESET}\n")
+    titles = ["CONTAINER", "SIZE", "USER", "FRAMEWORK", "STATUS"]
+    print(format_string.format(*titles))
+    #print("\t".join(titles))
+    #print("\n".join(output_lines))
+    # Print the container info
+    print("\n".join(format_string.format(*info) for info in output_lines)+"\n")
+    #print("")
+############################################################STATS##################################################
+# Define a function to format the container info
+def format_container_stats(container_stats_dict):
+    # Regular expression to capture the container_name, within the container_tag, located before ._. (example: containername._.1001)
+    #container_name_pattern = re.compile(r'^([a-zA-Z0-9]+)\._\d{4}$')  
+    #print(f"container_info_dict: {container_info_dict}")
+    #container_name_tag = container_info_dict['Names']
+    #print(f"container_name_tag: {container_name_tag}")
+    #user = container_info_dict.get('Labels', {}).get(f'aime.mlc.{user_name}', {})
+    # Extract the 'Labels' field
+    labels_string = container_stats_dict.get('Labels', {})
+    # Split the labels string into key-value pairs
+    #labels_dict = dict(pair.split('=', 1) for pair in labels_string.split(','))
+    #print(f"labels_dict: {labels_dict}")
+    # Retrieve the value for 'aime.mlc.USER'
+    container_name = container_stats_dict["Name"].split('._.')[0]
+    cpu_usage_perc = container_stats_dict["CPUPerc"]
+    memory_usage = container_stats_dict["MemUsage"]
+    memory_usage_perc = container_stats_dict["MemPerc"]
+    processes_active = container_stats_dict["PIDs"]
+    stats_to_be_printed = [f"[{container_name}]", cpu_usage_perc, memory_usage, memory_usage_perc, processes_active]
+
+    #print(f"info_to_be_printed: {info_to_be_printed}")
+    #output = "\t".join(info_to_be_printed)
+    #print(f"info_to_be_printed: {output}")
+    # Use regular expression to find the container name before ._.
+    #match = container_name_pattern.match(container_name_tag)
+    #container_name = match.group(1) if match else container_name_tag
+    #print(f"container_name: {container_name}")
+    # Format the output line
+    return stats_to_be_printed #"_".join(info_to_be_printed)
+
+
+def show_container_stats(stream):  
+    
+    """Fetch and optionally stream Docker container stats."""
+    # Determine the correct Docker command based on the stream flag
+    if stream:
+        print("\nStreaming ml-containers stats (press Ctrl+C to stop):\n")
+        #command = "docker stats --format '{{json .}}'"
+        command = [
+            "docker",
+            "stats",
+            "--format",'{{json .}}'
+        ]
+    else:
+        #print("\nFetching ml-containers stats once:\n")
+        #command = "docker stats --no-stream --format '{{json .}}'"
+        command = [
+            "docker",
+            "stats",
+            "--no-stream",
+            "--format",'{{json .}}'
+        ]
+    process = subprocess.Popen(
+        command, 
+        shell=False,
+        text=True, 
+        stdout=subprocess.PIPE, 
+        stderr=subprocess.PIPE
+        )
+    #print("Ich bin hier")
+
+    #stdout_data = process.stdout()
+    stdout_data, stderr_data = process.communicate()
+    print("Ich bin hier")
+    try:
+        # Print the final processed output
+        # Define an output format string with specified widths
+        format_string = "{:<15}{:<15}{:<30}{:<15}{:<15}"
+        print(f"\n{GREEN}Running ml-containers:{RESET}\n")
+        titles = ["CONTAINER", "CPU %", "MEM USAGE / LIMIT", "MEM %", "PROCESSES (PIDs)"]
+        while True:           
+            
+            # Break the loop if no stdout_data is received (for non-stream mode)
+            if not stdout_data and not stream:
+                process.terminate()
+                break
+            if stdout_data:
+            
+                # Split into individual lines and process them as JSON objects
+                output_lines = []
+
+                # Split by newlines and parse each line as JSON
+                json_lines = stdout_data.split('\n') #list
+
+                containers_stats = [json.loads(line) for line in json_lines if line]
+
+                # Apply formatting to all containers' info
+                output_lines = list(map(format_container_stats, containers_stats))
+
+                print(format_string.format(*titles))
+
+                print("\n".join(format_string.format(*info) for info in output_lines)+"\n")
+            
+            # Exit after processing one time in non-streaming mode
+            if not stream:
+                process.terminate()
+                break
+        
+    except KeyboardInterrupt:
+        if stream:
+            print("\nTerminating streaming of container stats.")
+        process.terminate()
+        process.wait()
+
+def show_container_stats1(stream):
+
+    """Fetch and optionally stream Docker container stats."""
+    # Determine the correct Docker command based on the stream flag
+    if stream:
+        print("\nStreaming ml-containers stats (press Ctrl+C to stop):\n")
+        #command = "docker stats --format '{{json .}}'"
+        command = [
+            "docker",
+            "stats",
+            "--format",'{{json .}}'
+        ]
+    else:
+        #print("\nFetching ml-containers stats once:\n")
+        #command = "docker stats --no-stream --format '{{json .}}'"
+        command = [
+            "docker",
+            "stats",
+            "--no-stream",
+            "--format",'{{json .}}'
+        ]
+    process = subprocess.Popen(
+        command, 
+        shell=False,
+        text=True, 
+        stdout=subprocess.PIPE, 
+        stderr=subprocess.PIPE
+        )
+    stdout_data, stderr_data = process.communicate()
+
+    try:
+        # Print the header
+        #print("CONTAINER\tCPU %\tMEM USAGE")
+        format_string = "{:<15}{:<30}{:<15}{:<30}{:<30}"
+        print(f"\n{GREEN}Running ml-containers:{RESET}\n")
+        titles = ["CONTAINER", "CPU %", "MEM USAGE / LIMIT", "MEM %", "PROCESSES (PIDs)"]
+        print(stdout_data)
+        while True:
+            # Read a line of output (either a single line or continuously)
+            #line = stdout_data.readline().strip()
+            stdout_data = str(stdout_data.strip())
+            
+            # Break the loop if no line is received (for non-stream mode)
+            if not stdout_data and not stream:
+                break
+            
+            if stdout_data:
+                try:
+                    # Parse the line as JSON
+                    container_stats = json.loads(line)
+                    container_name = container_stats["Name"].split('._.')[0]
+                    cpu_usage = container_stats["CPUPerc"]
+                    memory_usage = container_stats["MemUsage"]
+                    # Print the formatted output for each container
+                    print(f"{container_name}\t{cpu_usage}\t{memory_usage}")
+                except json.JSONDecodeError:
+                    print(f"Error parsing line: {line}", file=sys.stderr)
+
+            # Exit after processing one line in non-streaming mode
+            if not stream:
+                break
+
+    except KeyboardInterrupt:
+        if stream:
+            print("\nTerminating streaming of container stats.")
+        process.terminate()
+        process.wait()
+
+
+
 ###############################################################################################################
     
 
@@ -549,13 +830,7 @@ def main():
         # Extract framework, version and docker image from the ml_images.repo file
         framework_version_docker, frameworks = extract_from_ml_images(repo_file, filter_cuda_architecture)
         #print(f"ML_REPO: {framework_version_docker}") #DEBUGGING
-        
-        # Obtain user and group id, user name for different tasks by create, open,...
-        user_id = os.getuid()
-        #user_name = subprocess.getoutput("id -un")
-        user_name = pwd.getpwuid(user_id).pw_name
-        group_id = os.getgid()        
-        
+              
 
         if args.command == 'create':
 
@@ -675,7 +950,7 @@ def main():
             # Run the Docker Container: Starts a new container, installs necessary packages, 
             # and sets up the environment.
             #print("docker_run_cmd will be created")
-            # ToDo: subtitute in docker_run_cmd the os.getlogin() by user_id (see below)
+            # ToDo(OK): subtitute in docker_run_cmd the os.getlogin() by user_name (see below)
             docker_run_cmd = [                
                 'docker', 'run', '-v', f'{args.workspace_dir}:{workspace}', '-w', workspace,
                 '--name', container_tag, '--tty', '--privileged', '--gpus', args.num_gpus,
@@ -690,10 +965,10 @@ def main():
                 'bash', '-c',
                 f'echo "export PS1=\'[{validated_container_name}] `whoami`@`hostname`:${{PWD#*}}$ \'" >> ~/.bashrc; '
                 f'apt-get update -y > /dev/null; apt-get install sudo git -q -y > /dev/null; '
-                f'addgroup --gid {group_id} {os.getlogin()} > /dev/null; '
-                f'adduser --uid {user_id} --gid {group_id} {os.getlogin()} --disabled-password --gecos aime > /dev/null; '
-                f'passwd -d {os.getlogin()}; echo "{os.getlogin()} ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/{os.getlogin()}_no_password; '
-                f'chmod 440 /etc/sudoers.d/{os.getlogin()}_no_password; exit'
+                f'addgroup --gid {group_id} {user_name} > /dev/null; '
+                f'adduser --uid {user_id} --gid {group_id} {user_name} --disabled-password --gecos aime > /dev/null; '
+                f'passwd -d {user_name}; echo "{user_name} ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/{user_name}_no_password; '
+                f'chmod 440 /etc/sudoers.d/{user_name}_no_password; exit'
             ]
             #print("subprocess docker_run_cmd will starten")       
             # ToDo: not use subprocess.run but subprocess.Popen 
@@ -744,9 +1019,9 @@ def main():
                 '-it', 
                 '-w', workspace, 
                 '--name', container_tag,
-                '--label', f'{container_label}={os.getlogin()}', 
+                '--label', f'{container_label}={user_name}', 
                 '--label', f'{container_label}.NAME={validated_container_name}',
-                '--label', f'{container_label}.USER={os.getlogin()}', 
+                '--label', f'{container_label}.USER={user_name}', 
                 '--label', f'{container_label}.VERSION={mlc_version}',
                 '--label', f'{container_label}.WORK_MOUNT={args.workspace_dir}', 
                 '--label', f'{container_label}.DATA_MOUNT={args.data_dir}',
@@ -784,6 +1059,9 @@ def main():
             print(f"\n[{validated_container_name}] ready. Open the container with: mlc open {validated_container_name}\n")
         
             # docker ps --format "{{.Label \"aime.mlc.NAME\"}}"
+
+
+
             
         if args.command == 'open':           
             
@@ -919,6 +1197,17 @@ def main():
                 available_user_containers, 
                 available_user_container_tags
             )
+            available_container_number = len(available_user_containers)
+            running_container_number = len(running_containers)
+            no_running_container_number = len(no_running_containers)
+
+            if no_running_container_number == 0:
+                print(
+                    f"{RED}\nERROR!!: There are only running containers ({running_container_number}) or not containers at all. \n \
+                    You cannot remove running containers. Here an overview of running/not-running containers."
+                )
+                show_container_info(False) 
+                exit(1)
             print(f"available user containers: {available_user_containers}")
             print(f"running containers: {running_containers}")      
             print(f"running container_tags: {running_container_tags}")
@@ -1022,10 +1311,8 @@ def main():
                     #stderr=subprocess.PIPE,
             )
             stdout, _ = process.communicate()  # Communicate handles interactive input/output
-            out = stdout.strip()
+            container_image = stdout.strip()
             #exit_code = process.returncode
-            
-            container_image = out
             
             #container_image = get_container_image(selected_container_tag)
             print(f"container_image: {container_image}")
@@ -1111,7 +1398,134 @@ def main():
             else:
                 print(f"[{selected_container_name}] container already running")
                 sys.exit(-1)
-      
+
+
+        if args.command == 'list':            
+ 
+            show_container_info(args.all)
+            '''
+            # Adapt the filter to the selected flags (no flag or --all)
+            filter_aime_mlc_user =  "label=aime.mlc" if args.all else f"label=aime.mlc={user_name}"
+            #ERROR: docker_command_ls = f"docker container ls -a --filter{filter_aime_mlc_user} --format {{json .}}'"
+            #print(f"filter_aime_mlc_user: {filter_aime_mlc_user}")
+            docker_command_ls = [
+                "docker", "container", 
+                "ls", 
+                "-a", 
+                "--filter", filter_aime_mlc_user, 
+                "--format", '{{json .}}'    
+            ]
+            #print(f"docker_command_ls: {docker_command_ls}")
+            # Initialize Popen to run the docker command with JSON output
+            process = subprocess.Popen(
+                docker_command_ls, 
+                shell=False,
+                text=True,
+                stdout=subprocess.PIPE,  # Capture stdout
+                stderr=subprocess.PIPE    # Capture stderr
+            )
+            
+            # Communicate with the process to get output and errors
+            stdout_data, stderr_data = process.communicate()        
+            stdout_data = str(stdout_data.strip())
+
+            # Check for any errors
+            if process.returncode != 0:
+                print(f"Error: {stderr_data}")
+            else:
+                # Split into individual lines and process them as JSON objects
+                output_lines = []
+                try:
+                    # Split by newlines and parse each line as JSON
+                    json_lines = stdout_data.split('\n') #list
+                    #print(len(json_lines))
+                    #print(f"type jsonlines[0]: {type(json_lines[0])}")
+                    #print(f"jsonlines: {json_lines}")
+                    containers_info = [json.loads(line) for line in json_lines if line]
+                    #print(f"type containers_info[0]: {type(containers_info[0])}")
+                    #print(f"containers_info: {containers_info}")
+                    #print(len(containers_info))
+
+                    # Apply formatting to all containers' info
+                    output_lines = list(map(format_container_info, containers_info))
+              
+                except json.JSONDecodeError:
+                    print("Failed to decode JSON output.")
+                except KeyError as e:
+                    print(f"Missing expected key: {e}")
+            # Print the final processed output
+            # Define an output format string with specified widths
+            format_string = "{:<15}{:<30}{:<15}{:<30}{:<30}"
+            print(f"\n{GREEN}Available ml-containers are:{RESET}\n")
+            titles = ["CONTAINER", "SIZE", "USER", "FRAMEWORK", "STATUS"]
+            print(format_string.format(*titles))
+            #print("\t".join(titles))
+            #print("\n".join(output_lines))
+            # Print the container info
+            print("\n".join(format_string.format(*info) for info in output_lines)+"\n")
+            #print("")
+            '''
+
+        if args.command == 'stats':
+            
+            # Call the function with the correct mode (stream or no-stream)
+            show_container_stats(args.stream)
+            
+            
+            '''
+            # Print a message to the console indicating the running ml-containers
+            print("\nRunning ml-containers are:\n")
+
+            # Run the 'docker container stats' command to get container name, CPU usage, and memory usage
+            # The `--format` uses default placeholders for the full container name, CPU percentage, and memory usage
+            docker_command = [
+                "docker", "container", "stats",
+                "--format", "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}",
+                "--no-stream"
+            ]
+
+            # Use subprocess to execute the command and capture the output
+            process = subprocess.Popen(docker_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            output, error = process.communicate()
+
+            # Check if the command returned an error
+            if error:
+                print(f"Error: {error.decode()}")
+            else:
+                # Convert the output from bytes to string
+                output_str = output.decode()
+                print(str(output_str))
+                # Split the output by lines
+                lines = output_str.splitlines()
+                print(lines)
+                # Initialize a list to hold the formatted output
+                formatted_output = []
+
+                # Process each line
+                for line in lines:
+                    # Split each line by tab to separate fields (container name, CPU %, memory usage)
+                    parts = line.split('\t')
+
+                    # If there are at least 3 parts (name, CPU %, memory usage), process the name
+                    if len(parts) >= 3:
+                        # Split the container name by "._." and take the first part
+                        container_name = parts[0].split('._.')[0]
+
+                        # Rebuild the line with the modified container name
+                        formatted_output.append(f"[{container_name}]\t{parts[1]}\t{parts[2]}")
+
+                # Join the formatted output back into a string
+                output_str = "\n".join(formatted_output)
+
+                # Replace "[78]" with "CONTAINER" in the output for consistency
+                output_str = output_str.replace("[78]   ", "CONTAINER")
+
+                # Print the formatted output
+                print(output_str)
+
+            # Print an empty line for better readability
+            print("")
+            '''
         if args.command == 'stop':
 
             # List existing containers of the current user
@@ -1120,7 +1534,7 @@ def main():
             # Automate filtering
             running_containers, running_container_tags = filter_running_containers(
                 containers_state, 
-                #True,
+                True,
                 available_user_containers, 
                 available_user_container_tags
             )        
