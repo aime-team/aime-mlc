@@ -107,11 +107,11 @@ def get_flags():
     parser_stop = subparsers.add_parser('stop', help='Stop existing container/s')
     parser_stop.add_argument('container_name', nargs = '?', type=str, help='Name of the container/s to be stopped')
     parser_stop.add_argument('-fs', '--force_stop', action = "store_true", help='Force to stop the container without asking the user.') 
+    
     # Parser for the "update-sys" command
     parser_update_sys = subparsers.add_parser('update-sys', help='Update of the system')
-    #parser_update_sys.add_argument('container_name', nargs = '?', type=str, help='List of  of the container/s to open')
-              
-        
+    parser_update_sys.add_argument('-ud', '--update_directly', action = "store_true", help='Force to update directly without asking user.') 
+            
     # Extract subparser names
     subparser_names = subparsers.choices.keys()
     available_commands = list(subparser_names)
@@ -798,6 +798,7 @@ def show_container_stats1(stream):
             print("\nTerminating streaming of container stats.")
         process.terminate()
         process.wait()
+############################################################UPDATE_SYS##################################################
 
 
 
@@ -831,7 +832,79 @@ def main():
         framework_version_docker, frameworks = extract_from_ml_images(repo_file, filter_cuda_architecture)
         #print(f"ML_REPO: {framework_version_docker}") #DEBUGGING
               
+        if args.command == 'update-sys':
+            # Set to False initially
+            to_be_updated_directly = False
 
+            # Get the directory of the current script
+            mlc_path = os.path.dirname(os.path.abspath(__file__))
+            
+            # Change the current directory to MLC_PATH
+            os.chdir(mlc_path)
+            
+            # Check if the .git directory exists
+            if not os.path.isdir(f"{mlc_path}/.git"):
+                print("Failed: ML container system not installed as updatable git repo")
+                sys.exit(-1)  # Exit if the directory is not a git repo
+                        
+            # Determine if sudo is required for git operations
+            sudo = "sudo"
+            if os.access(f"{mlc_path}/.git", os.W_OK):
+                sudo = ""  # No sudo if the git directory is writable
+            # Fix for "unsafe repository" warning in Git adding the mlc-directory to the list of safe directories
+            docker_command_git_config = ["git", "config", "--global", "--add", "safe.directory", mlc_path]
+            subprocess.run(docker_command_git_config)
+
+            # Get the current branch name
+            docker_command_current_branch = ["git", "symbolic-ref", "HEAD"]
+            branch = subprocess.check_output(docker_command_current_branch, universal_newlines=True).strip().split("/")[-1]
+            
+            if not args.update_directly:
+                        
+                print(f"\n\nHint: use the flag -ud or --update_directly to avoid be asked.")
+                
+                print("\nThis will update the ML container system to the latest version.\n")
+
+                # If sudo is required, ask if the user wants to check for updates
+                if sudo == "":
+                    reply = input("Check for available updates? (y/n) ").strip().lower()
+                    if reply != 'y':
+                        sys.exit(0)  # Exit if user does not want to check for updates
+
+                # Fetch the latest updates from remote repo
+                docker_command_git_remote = ["git", "remote", "update"]
+                sudo and docker_command_git_remote.insert(0, sudo)
+                subprocess.run(docker_command_git_remote)
+                
+                # Get the update log for commits that are new in the remote repo
+                docker_command_git_log = ["git", "log", f"HEAD..origin/{branch}", "--pretty=format:%s"]
+                sudo and docker_command_git_log.insert(0, sudo)
+                update_log = subprocess.check_output(docker_command_git_log, text=True).strip()
+                
+                if update_log == "":
+                    print("ML container system is up to date.\n")
+                    sys.exit(-1)  # Exit if no updates are available
+                
+                # Print the update log and prompt the user to confirm update
+                print(f"Update(s) available.\n\nChange Log:\n{update_log}\n")
+                reply = input("Update ML container system? (y/n) ").strip().lower()
+                if reply in ["y", "yes"]:
+                    args.update_directly = True  # Set confirmed to True if user agrees to update
+                else:
+                    sys.exit(0)  # Exit if user does not want to update
+                
+           # If confirmed, proceed with the update
+            try:
+                print("\nUpdating ML container system...\n")
+                # Pull the latest changes from the remote repo
+                docker_command_git_pull = ["git", "pull", "origin", branch]
+                sudo and docker_command_git_pull.insert(0, sudo)          
+                subprocess.run(docker_command_git_pull)
+                sys.exit(1)  # Exit after successful update
+            except Exception as e:
+                print(f"Error during update: {e}")
+                sys.exit(-1)  # Exit with an error if update fails
+                        
         if args.command == 'create':
 
             if args.container_name is None and args.framework is None and args.version is None:
