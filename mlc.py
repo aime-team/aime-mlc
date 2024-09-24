@@ -32,18 +32,23 @@ group_id = os.getgid()
 #print(f"user_name_pwd: {user_name_pwd}")
 #print(f"user_name_login: {user_name}")
 
-# ANSI escape codes
-RED = "\033[91m"
-GREEN = "\033[92m"
-YELLOW = "\033[93m"
-BLUE = "\033[94m"
-MAGENTA = "\033[95m"
-CYAN = "\033[96m"
-ORANGE1 = "\033[38;5;208m"  # Orange color (closer to orange)
-ORANGE2 = "\033[38;5;214m"  # Light orange color
+# Coloring the frontend (ANSI escape codes)
+
+ERROR = "\033[91m"          # Red
+INFO = "\033[92m"           # Green
+REQUEST = "\033[96m"        # Cyan
+WARNING = "\033[38;5;208m"  # Orange color (closer to orange)
+INPUT = "\033[38;5;214m"    # Light orange color
+HINT = "\033[93m"           # Yellow
+
 RESET = "\033[0m"
 
+MAGENTA = "\033[95m"
+BLUE = "\033[94m"
+
+
 #ToDo: add constants
+
 # Definition of command constants:
 STOP = 'stop'
 
@@ -61,12 +66,15 @@ def get_flags():
     # Create subparsers for different commands
     subparsers = parser.add_subparsers(dest='command', required=False, help='Sub-command to execute')
 
+  
     # Parser for the "create" command
     parser_create = subparsers.add_parser('create', help='Create a new container')
     parser_create.add_argument('container_name', nargs='?', type=str, help='Name of the container')
     parser_create.add_argument('framework', nargs='?', type=str, help='The framework to use')
     parser_create.add_argument('version', nargs='?', type=str, help='The version of the framework')
-    parser_create.add_argument('-w', '--workspace_dir', type=str, default=os.path.expanduser('~/workspace'),
+    #parser_create.add_argument('-w', '--workspace_dir', default=os.path.expanduser('~/workspace'), type=str, 
+    #                           help='Location of the workspace directory. Default: /home/$USER/workspace')
+    parser_create.add_argument('-w', '--workspace_dir', default=None, type=str, 
                                help='Location of the workspace directory. Default: /home/$USER/workspace')
     parser_create.add_argument('-d', '--data_dir', type=str, help='Location of the data directory.')
     parser_create.add_argument('-ng', '--num_gpus', type=str, default='all',
@@ -74,13 +82,13 @@ def get_flags():
 
     # Parser for the "export" command
     parser_export = subparsers.add_parser('export', help='Export container/s')
-    parser_export.add_argument('container_name', nargs = '?', type=str, help='Name of the containers to be exported')
-    parser_export.add_argument('destination', nargs = '?', type=str, help='Destination to the export') 
+    #parser_export.add_argument('container_name', nargs = '?', type=str, help='Name of the containers to be exported')
+    #parser_export.add_argument('destination', nargs = '?', type=str, help='Destination to the export') 
 
     # Parser for the "import" command
     parser_import = subparsers.add_parser('import',  help='Import container/s')
-    parser_import.add_argument('container_name', nargs = '?', type=str, help='Name of the container/s to be imported')
-    parser_import.add_argument('source', nargs = '?', type=str, help='Source from the import')
+    #parser_import.add_argument('container_name', nargs = '?', type=str, help='Name of the container/s to be imported')
+    #parser_import.add_argument('source', nargs = '?', type=str, help='Source from the import')
     
     # Parser for the "list" command
     parser_list = subparsers.add_parser('list', help='List of created ml-containers')
@@ -110,7 +118,7 @@ def get_flags():
     
     # Parser for the "update-sys" command
     parser_update_sys = subparsers.add_parser('update-sys', help='Update of the system')
-    parser_update_sys.add_argument('-ud', '--update_directly', action = "store_true", help='Force to update directly without asking user.') 
+    parser_update_sys.add_argument('-fu', '--force_update', action = "store_true", help='Force to update directly without asking user.') 
             
     # Extract subparser names
     subparser_names = subparsers.choices.keys()
@@ -122,14 +130,14 @@ def get_flags():
    # If no command is provided, prompt the user to choose one
     while not args.command:
         # ToDo: use the same method: 1) create, 2) open.... instead of a list of the actions
-        print(f"{GREEN}Available commands:{RESET} " + ', '.join(available_commands))
-        chosen_command = input(f"{CYAN}Please choose a command:{RESET} ").strip()
+        print(f"\n{INFO}Available commands:{RESET} \n" + ', '.join(available_commands) + "\n")
+        chosen_command = input(f"{REQUEST}Please choose a command:{RESET} ").strip()
         if chosen_command in available_commands:
             # Re-parse arguments with the chosen command
             sys.argv.insert(1, chosen_command)
             args = parser.parse_args()
         else:
-            print(f"{RED}Invalid command:{RESET} {chosen_command}")
+            print(f"\n{ERROR}Invalid command:{RESET} {chosen_command}")
     
     # Convert the Namespace object to a dictionary
     args_dict = vars(args)
@@ -191,9 +199,10 @@ def get_container_name(container_name, user_name, command):
         return validate_container_name(container_name)
     else:
         while True:                           
-            container_name = input(f"{CYAN}Enter a container name: {RESET}")
+            container_name = input(f"\n{REQUEST}Enter a container name: {RESET}")
             if container_name in available_user_containers:
-                print(f'Provided container name [{container_name}] already exists. Provide a new container name')
+                print(f'\n{INPUT}[{container_name}]{RESET} {ERROR}already exists. Provide a new container name.{RESET}')
+                show_container_info(False)
                 continue
             try:
                 return validate_container_name(container_name)
@@ -213,7 +222,7 @@ def validate_container_name(container_name):
     if not pattern.match(container_name):
         invalid_chars = [char for char in container_name if not re.match(r'[a-zA-Z0-9_\-#]', char)]
         invalid_chars_str = ''.join(invalid_chars)
-        raise ValueError(f"The container name {ORANGE2}{container_name}{RESET} contains {RED}invalid{RESET} characters: {RED}{invalid_chars_str}{RESET}")
+        raise ValueError(f"The container name {INPUT}{container_name}{RESET} contains {ERROR}invalid{RESET} characters: {ERROR}{invalid_chars_str}{RESET}")
     return container_name
 
 
@@ -225,7 +234,7 @@ def display_frameworks(frameworks_dict):
     Return:
     
     """    
-    print(f"\n{CYAN}Please, select a framework:{RESET}")
+    print(f"\n{REQUEST}Select a framework:{RESET}")
     framework_list = list(frameworks_dict.keys())
     for i, framework in enumerate(framework_list, start=1):
         print(f"{i}) {framework}")
@@ -246,9 +255,9 @@ def get_user_selection(prompt, max_value):
             if 1 <= selection <= max_value:
                 return selection
             else:
-                print(f"{RED}Please enter a number between 1 and {max_value}.{RESET}")
+                print(f"{ERROR}Please enter a number between 1 and {max_value}.{RESET}")
         except ValueError:
-            print("Invalid input. Please enter a valid number.")
+            print(f"{ERROR}Invalid input. Please enter a valid number.{RESET}")
 # ToDo: actually not needed this function (only 1 line). Try to embed the list comprenhension within the code (OK)
 '''
 def get_versions(versions):
@@ -271,7 +280,7 @@ def display_versions(framework, versions):
     Return:
     
     """    
-    print(f"\n{CYAN}Available versions for {framework}:{RESET}")
+    print(f"\n{INFO}Available versions for {framework}:{RESET}")
     for i, (version, _) in enumerate(versions, start=1):
         print(f"{i}) {version}")
 
@@ -392,7 +401,7 @@ def existing_user_containers(user_name, mlc_command):
     #print(f"Container_tags: {container_tags}")
     # check that at least 1 container has been created previously
     if not container_tags and mlc_command != 'create':
-        print(f"{RED}Create at least one container. If not, mlc {mlc_command} does not work!!{RESET}")
+        print(f"\n{ERROR}Create at least one container. If not, mlc {mlc_command} does not work.{RESET}\n")
         exit(1)
 
     # Extract base names from full container names
@@ -421,14 +430,14 @@ def select_container(container_list):
     """
     while True:
         try:
-            selection = int(input(f"{CYAN}Select the number of the container:{RESET}"))
+            selection = int(input(f"\n{REQUEST}Select the number of the container:{RESET}"))
             container_list_length = len(container_list)
             if 1 <= selection <= container_list_length:
                 return container_list[selection - 1], selection
             else:
-                print(f"{RED}Invalid selection. Please choose a valid number.{RESET}")
+                print(f"\n{ERROR}Invalid selection. Please choose a valid number.{RESET}")
         except ValueError:
-            print(f"{RED}Invalid input. Please enter a number.{RESET}")
+            print(f"\n{ERROR}Invalid input. Please enter a number.{RESET}")
             
 def check_container_running(container_name):
     """
@@ -617,7 +626,7 @@ def show_container_info(args_all):
     # Print the final processed output
     # Define an output format string with specified widths
     format_string = "{:<15}{:<30}{:<15}{:<30}{:<30}"
-    print(f"\n{GREEN}Available ml-containers are:{RESET}\n")
+    print(f"\n{INFO}Current status of the ml-containers:{RESET}\n")
     titles = ["CONTAINER", "SIZE", "USER", "FRAMEWORK", "STATUS"]
     print(format_string.format(*titles))
     #print("\t".join(titles))
@@ -686,16 +695,16 @@ def show_container_stats(stream):
         stdout=subprocess.PIPE, 
         stderr=subprocess.PIPE
         )
-    #print("Ich bin hier")
+
 
     #stdout_data = process.stdout()
     stdout_data, stderr_data = process.communicate()
-    print("Ich bin hier")
+
     try:
         # Print the final processed output
         # Define an output format string with specified widths
         format_string = "{:<15}{:<15}{:<30}{:<15}{:<15}"
-        print(f"\n{GREEN}Running ml-containers:{RESET}\n")
+        print(f"\n{INFO}Running ml-containers:{RESET}\n")
         titles = ["CONTAINER", "CPU %", "MEM USAGE / LIMIT", "MEM %", "PROCESSES (PIDs)"]
         while True:           
             
@@ -730,7 +739,7 @@ def show_container_stats(stream):
             print("\nTerminating streaming of container stats.")
         process.terminate()
         process.wait()
-
+'''
 def show_container_stats1(stream):
 
     """Fetch and optionally stream Docker container stats."""
@@ -765,7 +774,7 @@ def show_container_stats1(stream):
         # Print the header
         #print("CONTAINER\tCPU %\tMEM USAGE")
         format_string = "{:<15}{:<30}{:<15}{:<30}{:<30}"
-        print(f"\n{GREEN}Running ml-containers:{RESET}\n")
+        print(f"\n{INFO}Running ml-containers:{RESET}\n")
         titles = ["CONTAINER", "CPU %", "MEM USAGE / LIMIT", "MEM %", "PROCESSES (PIDs)"]
         print(stdout_data)
         while True:
@@ -798,6 +807,7 @@ def show_container_stats1(stream):
             print("\nTerminating streaming of container stats.")
         process.terminate()
         process.wait()
+'''
 ############################################################UPDATE_SYS##################################################
 
 
@@ -832,101 +842,54 @@ def main():
         framework_version_docker, frameworks = extract_from_ml_images(repo_file, filter_cuda_architecture)
         #print(f"ML_REPO: {framework_version_docker}") #DEBUGGING
               
-        if args.command == 'update-sys':
-            # Set to False initially
-            to_be_updated_directly = False
 
-            # Get the directory of the current script
-            mlc_path = os.path.dirname(os.path.abspath(__file__))
-            
-            # Change the current directory to MLC_PATH
-            os.chdir(mlc_path)
-            
-            # Check if the .git directory exists
-            if not os.path.isdir(f"{mlc_path}/.git"):
-                print("Failed: ML container system not installed as updatable git repo")
-                sys.exit(-1)  # Exit if the directory is not a git repo
-                        
-            # Determine if sudo is required for git operations
-            sudo = "sudo"
-            if os.access(f"{mlc_path}/.git", os.W_OK):
-                sudo = ""  # No sudo if the git directory is writable
-            # Fix for "unsafe repository" warning in Git adding the mlc-directory to the list of safe directories
-            docker_command_git_config = ["git", "config", "--global", "--add", "safe.directory", mlc_path]
-            subprocess.run(docker_command_git_config)
-
-            # Get the current branch name
-            docker_command_current_branch = ["git", "symbolic-ref", "HEAD"]
-            branch = subprocess.check_output(docker_command_current_branch, universal_newlines=True).strip().split("/")[-1]
-            
-            if not args.update_directly:
-                        
-                print(f"\n\nHint: use the flag -ud or --update_directly to avoid be asked.")
-                
-                print("\nThis will update the ML container system to the latest version.\n")
-
-                # If sudo is required, ask if the user wants to check for updates
-                if sudo == "":
-                    reply = input("Check for available updates? (y/n) ").strip().lower()
-                    if reply != 'y':
-                        sys.exit(0)  # Exit if user does not want to check for updates
-
-                # Fetch the latest updates from remote repo
-                docker_command_git_remote = ["git", "remote", "update"]
-                sudo and docker_command_git_remote.insert(0, sudo)
-                subprocess.run(docker_command_git_remote)
-                
-                # Get the update log for commits that are new in the remote repo
-                docker_command_git_log = ["git", "log", f"HEAD..origin/{branch}", "--pretty=format:%s"]
-                sudo and docker_command_git_log.insert(0, sudo)
-                update_log = subprocess.check_output(docker_command_git_log, text=True).strip()
-                
-                if update_log == "":
-                    print("ML container system is up to date.\n")
-                    sys.exit(-1)  # Exit if no updates are available
-                
-                # Print the update log and prompt the user to confirm update
-                print(f"Update(s) available.\n\nChange Log:\n{update_log}\n")
-                reply = input("Update ML container system? (y/n) ").strip().lower()
-                if reply in ["y", "yes"]:
-                    args.update_directly = True  # Set confirmed to True if user agrees to update
-                else:
-                    sys.exit(0)  # Exit if user does not want to update
-                
-           # If confirmed, proceed with the update
-            try:
-                print("\nUpdating ML container system...\n")
-                # Pull the latest changes from the remote repo
-                docker_command_git_pull = ["git", "pull", "origin", branch]
-                sudo and docker_command_git_pull.insert(0, sudo)          
-                subprocess.run(docker_command_git_pull)
-                sys.exit(1)  # Exit after successful update
-            except Exception as e:
-                print(f"Error during update: {e}")
-                sys.exit(-1)  # Exit with an error if update fails
                         
         if args.command == 'create':
 
             if args.container_name is None and args.framework is None and args.version is None:
                                 
                 print(
-                    "\n" +\
-                    f"{GREEN}Info{RESET}: \
-                    \nCreate a new machine learning container. \
-                    \n{GREEN}Correct Usage{RESET}: \
-                    \nmlc create <container_name> <framework_name> <framework_version> -w /home/$USER/workspace -d /data -ng 1 \
-                    \n{GREEN}Example{RESET}: \
-                    \nmlc create pt231aime Pytorch 2.3.1-aime\n"
+                    "\n" + '#'*100 + "\n" \
+                    f"\t{INFO}Info{RESET}: \
+                    \n\tCreate a new machine learning container. \
+                    \n\t{INFO}Correct Usage{RESET}: \
+                    \n\tmlc create <container_name> <framework_name> <framework_version> -w /home/$USER/workspace -d /data -ng 1 \
+                    \n\t{INFO}Example{RESET}: \
+                    \n\tmlc create pt231aime Pytorch 2.3.1-aime\n" + '#'*100
                 )                
 
-            # User provides the container name and be validated
+            # User provides the container name and is validated
             validated_container_name = get_container_name(args.container_name, user_name, args.command)
+                
+            '''    
+            if args.container_name:
+                # User provides the container name and is validated
+                validated_container_name = get_container_name(args.container_name, user_name, args.command)
+                # Generate a unique container tag
+                container_tag = f"{validated_container_name}._.{user_id}"
+            
+            while True:                        
+                # Check if a container with the generated tag already exists
+                if container_tag == check_container_exists(container_tag):
+                    print(f"\n{ERROR}Error:{RESET} \n {INPUT}[{validated_container_name}]{RESET} already exists.{RESET}")
+
+                    container_name_input = input(f"Provide a not used container name:")
+                    # User provides the container name and be validated
+                    validated_container_name = get_container_name(container_name_input, user_name, args.command)
+                    # Generate a unique container tag
+                    container_tag = f"{validated_container_name}._.{user_id}"
+                else:
+                    exit(1)
+            '''
+                
+                
+                
             
             # Framework part:
             if args.framework is None:            
                 while args.framework is None:
                     framework_list = display_frameworks(framework_version_docker)
-                    framework_num = get_user_selection(f"{CYAN}Enter the number of your framework: {RESET}", len(framework_list))
+                    framework_num = get_user_selection(f"{REQUEST}Enter the number of the desired framework: {RESET}", len(framework_list))
                     args.framework = framework_list[framework_num - 1]
             else:    
                 available_frameworks = list(framework_version_docker.keys())
@@ -935,10 +898,10 @@ def main():
                         break
                     else:
                         framework_list = display_frameworks(framework_version_docker)
-                        framework_number = get_user_selection(f"{CYAN}Enter the number of your framework: {RESET}", len(framework_list))
+                        framework_number = get_user_selection(f"{REQUEST}Enter the number of the desired framework: {RESET}", len(framework_list))
                         args.framework = framework_list[framework_number - 1]
                         #print(f"Available frameworks: {', '.join(available_frameworks)}")
-                        #selected_framework = input(f"{CYAN}Please select a valid framework: {RESET}")
+                        #selected_framework = input(f"{REQUEST}Please select a valid framework: {RESET}")
                 
             selected_framework = args.framework
                 
@@ -949,7 +912,7 @@ def main():
                 while args.version is None:  
                     #version_list = framework_version_docker[selected_framework]
                     display_versions(selected_framework, versions_images)
-                    version_number = get_user_selection(f"{CYAN}Enter the number of your version: {RESET}", len(versions_images))
+                    version_number = get_user_selection(f"{REQUEST}Enter the number of your version: {RESET}", len(versions_images))
                     # Version and docker image selected
                     args.version, selected_docker_image = versions_images[version_number - 1]
             else:
@@ -963,37 +926,113 @@ def main():
                         break
                     else:
                         display_versions(selected_framework, versions_images)
-                        version_number = get_user_selection(f"{CYAN}Enter the number of your version: {RESET}", len(versions_images))
+                        version_number = get_user_selection(f"{REQUEST}Enter the number of your version: {RESET}", len(versions_images))
                         # Version and docker image selected
                         args.version, selected_docker_image = versions_images[version_number - 1]
             
             selected_version = args.version
             
+            
+            # Default workspace directory
+            default_workspace_dir = os.path.expanduser('~/workspace')
+            
+            if args.workspace_dir:
+                # If the -w option is provided, use the user-provided path
+                provided_workspace_dir = os.path.expanduser(args.workspace_dir)
+                while True:
+                    # Check if the provided workspace directory exist:
+                    if os.path.isdir(provided_workspace_dir):
+                        break
+                    else:
+                        print(f"\n{ERROR}Workspace directory not existing:{RESET} {INPUT}{provided_workspace_dir}{RESET}")
+                        provided_workspace_dir = os.path.expanduser(input(f"\n{REQUEST}Provide the new location of the workspace directory:{RESET}").strip())
+                print(f'\n{INFO}Workspace directory changed to:{RESET} {INPUT}{provided_workspace_dir}{RESET}')
+            else:
+                
+                # If the -w option is not provided, ask the user if they want to change the default workspace
+                print(f"\n{INFO}The workspace directory would be mounted by default as /workspace in the container.{RESET}")
+                print(f"{INFO}It is the directory where your project data should be stored to be accessed inside the container.{RESET}")
+                print(f"{HINT}HINT: It can be set to an existing directory with the option '-w /your_workspace'{RESET}")
+                change_workspace_dir = input(f"\n{REQUEST}Do you want to change the default workspace directory ({default_workspace_dir}), (y/n)?: {RESET}").strip()
+                # Define a flag to control breaking out of both loops
+                break_outer_loop = False
+                while True:
+                    if change_workspace_dir in ["n","no"]:
+                        print(f'\n{INFO}Workspace directory:{RESET} {INPUT}{default_workspace_dir}{RESET}')
+                        break
+                    elif change_workspace_dir in ["y","yes"]:
+                        while True:
+                            # Ask the user to input the new workspace directory
+                            #provided_workspace_dir = input(f"Provide the new location of the workspace directory:").strip().lower()
+                            provided_workspace_dir = os.path.expanduser(input(f"\n{REQUEST}Provide the new location of the workspace directory:{RESET}").strip())  # Expand '~' to full path
+                            #print(f"Expanded workspace directory path: {provided_workspace_dir}")
+                            # provided_workspace_dir = input(f"Provide the new location of the workspace directory:").strip()  # Expand '~' to full path
+
+                            # Check if the provided workspace directory exist:
+                            if os.path.isdir(provided_workspace_dir):
+                                print(f'\n{INFO}Workspace directory changed to:{RESET} {INPUT}{provided_workspace_dir}{RESET}')
+                                break_outer_loop = True
+                                break
+                            else:
+                                print(f"\n{ERROR}Workspace directory not existing:{RESET} {INPUT}{provided_workspace_dir}{RESET}") 
+                        if break_outer_loop:
+                            break                           
+                    else:
+                        print(f"{ERROR}\nInvalid input. Please use y(yes) or n(no).{RESET}")
+                        break
+
+
+
+            '''
+            
+            if os.path.isdir(args.workspace_dir):
+                print(f"\n{INFO}/workspace will mount on:{RESET} {INPUT}{args.workspace_dir}{RESET}")
+            else:
+                print(f"\n{ERROR}Aborted.\n\nWorkspace directory not existing:{RESET} {INPUT}{args.workspace_dir}{RESET}")
+                print(f"\n{INFO}The workspace directory would be mounted as /workspace in the container.{RESET}")
+                print(f"\n{INFO}It is the directory where your project data should be stored to be accessed\ninside the container.{RESET}")
+                print(f"\n{INFO}It can be set to an existing directory with the option '-w /your_workspace'{RESET}")
+                sys.exit(-1)
+                            
+            if not args.workspace_dir:
+                while True:
+                    change_workspace_dir = input(f"Do you want to change the by-default workspace location (default: ~/workspace), (y/n):").strip().lower()
+                    if change_workspace_dir in ["n", "no"]:                          
+                        break
+                    elif change_workspace_dir in ["y", "yes"]:
+                        provided_workspace_dir = input(f"Provide the new location of the workspace directory:").strip().lower()
+                        # Check if the provided workspace directory exist:
+                        if os.path.isdir(provided_workspace_dir):
+                            break
+                        else:
+                            print(f"\n{ERROR}Workspace directory not existing:{RESET} {INPUT}{provided_workspace_dir}{RESET}")
+                    else:
+                        print(f"{ERROR}\nInvalid input. Please use y(yes) or n(no).{RESET}")  
+                        
+            '''    
+            args.workspace_dir = default_workspace_dir                 
             # Check if the provided workspace directory exist:
             if os.path.isdir(args.workspace_dir):
-                print(f"\n/workspace will mount on '{args.workspace_dir}' - OK")
+                print(f"\n{INFO}/workspace will mount on:{RESET} {INPUT}{args.workspace_dir}{RESET}")
             else:
-                print(f"\n{RED}ERROR!!: Aborted.\n\nWorkspace directory not existing: {args.workspace_dir}{RESET}")
-                print("\nThe workspace directory would be mounted as /workspace in the container.")
-                print("It is the directory where your project data should be stored to be accessed\ninside the container.")
-                print("\nIt can be set to an existing directory with the option '-w /your_workspace'\n")
-                sys.exit(-4)
+                print(f"\n{ERROR}Aborted.\n\nWorkspace directory not existing:{RESET} {INPUT}{args.workspace_dir}{RESET}")
+                print(f"\n{INFO}The workspace directory would be mounted as /workspace in the container.{RESET}")
+                print(f"\n{INFO}It is the directory where your project data should be stored to be accessed\ninside the container.{RESET}")
+                print(f"\n{INFO}It can be set to an existing directory with the option '-w /your_workspace'{RESET}")
+                sys.exit(-1)
             
             # Check if the provided data directory exist:
             if args.data_dir:
                 data_mount = os.path.realpath(args.data_dir)
                 if os.path.isdir(data_mount):
-                    print(f"/data will mount on '{data_mount}' - OK")
+                    print(f"{INFO}/data will mount on:{RESET} {INPUT}{data_mount}{RESET}")
                 else:
-                    print(f"\n{RED}ERROR!!: Aborted.\n\nData directory not existing: {data_mount}{RESET}")
-                    print("\nThe data directory would be mounted as /data in the container.")
-                    print("It is the directory where data sets, for example, mounted from\nnetwork volumes can be accessed inside the container.")
-                    sys.exit(-4)
+                    print(f"\n{ERROR}Aborted.\n\nData directory not existing: {data_mount}{RESET}")
+                    print(f"\n{INFO}The data directory would be mounted as /data in the container.{RESET}")
+                    print(f"\n{INFO}It is the directory where data sets, for example, mounted from\nnetwork volumes can be accessed inside the container.{RESET}")
+                    sys.exit(-1)
             
-            print(f"\nYou have selected: {ORANGE2}{selected_framework} {selected_version}{RESET}")
-            print(f"The mlc container called {ORANGE2}{validated_container_name}{RESET} with the framework {ORANGE2}{selected_framework}{RESET} and version {ORANGE2}{selected_version}{RESET} with docker image {selected_docker_image} will be created!!")
-            
-
+            print(f"\n{INFO}Selected Framework and Version:{RESET} {INPUT}{selected_framework} {selected_version}{RESET}")
             
             #############################################DOCKER TASKS START######################################################################
             # Generate a unique container tag
@@ -1003,17 +1042,18 @@ def main():
             
             # Check if a container with the generated tag already exists
             if container_tag == check_container_exists(container_tag):
-                print(f"\n{RED}Error:{RESET} \nContainer [{ORANGE2}{validated_container_name}{RESET}] already exists.")
+                print(f"\n{ERROR}Error:{RESET} \n {INPUT}[{validated_container_name}]{RESET} already exists.{RESET}")
                 sys.exit(-1)
             else:
-                print(f"{validated_container_name} will be created!!!")
+                print(f"\n{INFO}The mlc container will be created:{RESET} {INPUT}{validated_container_name}{RESET} ")
+
 
             # Pulling the required image from aime-hub: 
-            print("\nAcquiring container image ... \n")
+            print(f"\n{INFO}Acquiring container image ... {RESET}\n")
             docker_command_pull_image = ['docker', 'pull', selected_docker_image]         
             subprocess.run(docker_command_pull_image)
         
-            print("\nSetting up container ... \n")
+            print(f"\n{INFO}Setting up container ... {RESET}")
             
             # Adding 
             container_label = "aime.mlc"
@@ -1129,12 +1169,16 @@ def main():
             #print(f"STDOUT create_cmd: {result_create_cmd.stdout}")
             #print(f"STDERR create_cmd: {result_create_cmd.stderr}")
             
-            print(f"\n[{validated_container_name}] ready. Open the container with: mlc open {validated_container_name}\n")
+            print(f"\n{INPUT}[{validated_container_name}]{RESET} {INFO}ready. \n\nOpen the container with: mlc open{RESET} {INPUT}{validated_container_name}{RESET}\n")
         
             # docker ps --format "{{.Label \"aime.mlc.NAME\"}}"
 
-
-
+        if args.command == 'export':
+            #print(f"\n{INFO}\t|-*50{RESET}\n")
+            print(f"{INFO}\nNot yet implemented. Coming soon!{RESET}\n")
+            
+        if args.command == 'import':
+            print(f"\n{INFO}Not yet implemented. Coming soon!{RESET}\n")
             
         if args.command == 'open':           
             
@@ -1143,46 +1187,45 @@ def main():
             
             if args.container_name:     
                 if args.container_name not in available_user_containers:
-                    print(f"No containers found matching the name '{args.container_name}' for the current user.")
+                    print(f"\n{ERROR}No containers found matching the name{RESET} {INPUT}[{args.container_name}]{RESET} {ERROR}for the current user.{RESET}")
                     # ToDo: create a function ( the same 4 lines as below)
-                    print(f"{GREEN}Available containers of the current user:{RESET}")
+                    print(f"\n{INFO}Available containers of the current user:{RESET}")
                     print_existing_container_list(available_user_containers)
                     selected_container_name, selected_container_position = select_container(available_user_containers)
-                    print(f"{GREEN}Selected container to be opened:{RESET} {selected_container_name}")                            
+                    print(f"\n{INFO}Selected container to be opened:{RESET} {INPUT}{selected_container_name}{RESET}")                            
                 else:
                     selected_container_name = args.container_name
                     selected_container_position = available_user_containers.index(args.container_name) + 1
-                    print(f'Provided container name [{args.container_name}] exists and will be opened.')                   
+                    print(f'\n{INFO}Provided container name {RESET}{INPUT}[{args.container_name}]{RESET}{INFO} exists and will be opened.{RESET}')                   
             else:
                 print(
-                    "\n" +\
-                    f"{GREEN}Info{RESET}: \
-                    \nOpen an existing machine learning container.  \
-                    \n{GREEN}Correct Usage{RESET}: \
-                    \nmlc open <container_name>  \
-                    \n{GREEN}Example{RESET}: \
-                    \nmlc open pt231aime\n"
+                    "\n" + '#'*100 + "\n" \
+                    f"\t{INFO}Info{RESET}: \
+                    \n\tOpen an existing machine learning container.  \
+                    \n\t{INFO}Correct Usage{RESET}: \
+                    \n\tmlc open <container_name>  \
+                    \n\t{INFO}Example{RESET}: \
+                    \n\tmlc open pt231aime\n" + '#'*100
                 )
 
                 # ToDo: create a function ( the same 4 lines as above)
-                print(f"{GREEN}Available containers of the current user:{RESET}")
+                print(f"\n{INFO}Available containers of the current user:{RESET}")
                 print_existing_container_list(available_user_containers)
                 selected_container_name, selected_container_position = select_container(available_user_containers)
-                print(f"{GREEN}Selected container to be opened:{RESET} {selected_container_name}")
+                print(f"\n{INFO}Selected container to be opened:{RESET} {INPUT}{selected_container_name}{RESET}")
             
             # Obtain container_tag from the selected container name
             selected_container_tag = available_user_container_tags[selected_container_position-1]
-            print(f"Container_tag: {selected_container_tag}")
             
             # Start the existing selected container:
             if selected_container_tag != check_container_running(selected_container_tag):
-                print(f"[{selected_container_name}] starting container")
+                print(f"\n{INPUT}[{selected_container_name}]{RESET} {INFO}starting container...{RESET}")
                 docker_command = f"docker container start {selected_container_tag}"
                 _, _, _ = run_docker_command(docker_command)
             else:
-                print(f"[{selected_container_name}] container already running")
+                print(f"\n{INPUT}[{selected_container_name}]{RESET} {INFO}container already running.{RESET}")
 
-            print(f"[{selected_container_name}] opening shell to container")
+            print(f"\n{INPUT}[{selected_container_name}]{RESET} {INFO}opening shell to container...{RESET}")
             
             '''
             # Set environment variables for Docker exec
@@ -1208,9 +1251,7 @@ def main():
             # If the NCCL_P2P_LEVEL environment variable is set, include it in the environment settings
             if 'NCCL_P2P_LEVEL' in os.environ:
                 set_env += f" -e NCCL_P2P_LEVEL={os.environ.get('NCCL_P2P_LEVEL')}"   
-            print(f"SET_ENV value: {set_env}")
-            str(5)
-            "5"
+
             # Open an interactive shell session in the running container as the current user
             #docker_command = f"docker exec -it {set_env} --user {user_id}:{group_id} {selected_container_tag} /bin/bash"
             #'''
@@ -1226,31 +1267,31 @@ def main():
             ]
             #'''
 
-            print(f"Docker command: {docker_command_open_shell}")
+            #print(f"Docker command: {docker_command_open_shell}")
             #_, error_mesage, exit_code = run_docker_command1(docker_command)
 
             error_mesage, exit_code = run_docker_command1(docker_command_open_shell)
             # While the shell is open, the user can run commands, check the environment, or perform any other tasks inside the container.
             # Python script is effectively paused at this point, waiting for the shell session to finish.
             #print(f"stdout: {stdout}")
-            print(f'Error_mesage: {error_mesage}')
-            print(f"Exit code: {exit_code}")
+            #print(f'Error_mesage: {error_mesage}')
+            #print(f"Exit code: {exit_code}")
             # Now the user ends the session. How the shell session was terminated?
             if exit_code == 1:
-                print(f"[{selected_container_name}] detached from container, container keeps running")
+                print(f"\n{INPUT}[{selected_container_name}]{RESET} {INFO}detached from container, container keeps running.{RESET}")
             else:
-                print(f"[{selected_container_name}] container shell closed with exit code {exit_code}") 
+                print(f"\n{INPUT}[{selected_container_name}]{RESET} {INFO}container shell closed with exit code {exit_code}.{RESET}") 
             
             # Check the status of the opened container     
             active_status = is_container_active(selected_container_tag)
 
             if active_status == "True":
-                print(f"[{selected_container_name}] container is active, kept running.")
+                print(f"\n{INPUT}[{selected_container_name}]{RESET}{INFO}container is active, kept running.{RESET}")
             else:
-                print(f"[{selected_container_name}] container is inactive, stopping container ...")
+                print(f"\n{INPUT}[{selected_container_name}]{RESET}{INFO} container is inactive, stopping container ...{RESET}")
                 docker_command_stop_container = f"docker container stop {selected_container_tag}"
                 _, _, _ = run_docker_command(docker_command_stop_container)
-                print(f"[{selected_container_name}] container stopped.\n")  
+                print(f"\n{INPUT}[{selected_container_name}]{RESET}{INFO} container stopped.{RESET}\n")  
 
         if args.command == 'remove':
             
@@ -1274,85 +1315,100 @@ def main():
             running_container_number = len(running_containers)
             no_running_container_number = len(no_running_containers)
 
+
+            #print(f"available user containers: {available_user_containers}")
+            #print(f"running containers: {running_containers}")      
+            #print(f"running container_tags: {running_container_tags}")
+            #print(f"container_states: {containers_state}")
+            
+
+            #print(f"NO running containers: {no_running_containers}")      
+            #print(f"NO running container_tags: {no_running_container_tags}")            
+            # check that at least 1 container is running
+            #if not running_container_tags:
+            #    print(f"{ERROR} No containers are running and therefore there are no one to be stopped.{RESET}")
+            #    exit(1)
+            '''
             if no_running_container_number == 0:
                 print(
-                    f"{RED}\nERROR!!: There are only running containers ({running_container_number}) or not containers at all. \n \
-                    You cannot remove running containers. Here an overview of running/not-running containers."
+                    #f"{ERROR}\nThere are only running containers ({running_container_number}) or not containers at all.\n\nYou cannot remove running containers.{RESET}{INFO}\n\nHere an overview of current containers:{RESET}"
+                    f"{ERROR}\nYou cannot remove running containers.{RESET}{INFO}\n\nHere an overview of current containers:{RESET}"
+       
                 )
                 show_container_info(False) 
                 exit(1)
-            print(f"available user containers: {available_user_containers}")
-            print(f"running containers: {running_containers}")      
-            print(f"running container_tags: {running_container_tags}")
-            print(f"container_states: {containers_state}")
-            
-
-            print(f"NO running containers: {no_running_containers}")      
-            print(f"NO running container_tags: {no_running_container_tags}")            
-            # check that at least 1 container is running
-            #if not running_container_tags:
-            #    print(f"{RED}WARNING!!: No containers are running and therefore there are no one to be stopped.{RESET}")
-            #    exit(1)
-            
+            '''
             if args.container_name: 
                 if args.container_name in running_containers:
-                    print(f"{RED}The provided container [{args.container_name}] exists and is running. Not possible to be removed.{RESET}")
+                    if no_running_container_number == 0:
+                        print(
+                            #f"{ERROR}\nThere are only running containers ({running_container_number}) or not containers at all.\n\nYou cannot remove running containers.{RESET}{INFO}\n\nHere an overview of current containers:{RESET}"
+                            f"{ERROR}\nYou cannot remove running containers.{RESET}"
+                       )
+                        show_container_info(False) 
+                        exit(1)
+                    print(f"\n{ERROR}The provided container{RESET} {INPUT}[{args.container_name}]{RESET} {ERROR}exists and is running. Not possible to be removed.{RESET}")
                     # ToDo: create a function ( the same 4 lines as below)
-                    print(f"{GREEN}Only the following no running containers of the current user can be removed:{RESET} ")
+                    print(f"\n{INFO}Only the following no running containers of the current user can be removed:{RESET} ")
                     print_existing_container_list(no_running_containers)
-                    #print(f"{RED}WARNING!!: All running processes of the selected container will be terminated and you will NOT ask again. Be sure about your decision.{RESET}")
+                    #print(f"{ERROR} All running processes of the selected container will be terminated and you will NOT ask again. Be sure about your decision.{RESET}")
                     selected_container_name, selected_container_position = select_container(no_running_containers)
-                    print(f"{GREEN}Selected container to be removed:{RESET} {selected_container_name}")                            
+                    print(f"{INFO}Selected container to be removed:{RESET} {selected_container_name}")                            
                 elif args.container_name in no_running_containers:
                     selected_container_name = args.container_name
                     selected_container_position = no_running_containers.index(args.container_name) + 1
-                    print(f'\n[{args.container_name}] is not running and will be removed.')
+                    print(f'\n{INPUT}[{args.container_name}]{RESET} {INFO}is not running and will be removed.{RESET}')
                     if not args.force_remove:
                         
-                        print(f"\n\nHint: use the flag -fr or --force_remove to avoid be asked.")
+                        print(f"\n{HINT}Hint: use the flag -fr or --force_remove to avoid be asked.{RESET}")
 
                         while True:
                             
-                            user_input = input(f"\n\nAre you sure that you want to remove the container [{args.container_name}]? (y/n): ").strip().lower()
+                            print(f"\n{WARNING}Caution: After your selection, there is no option to recover the container. Be sure about your decision.{RESET}")
+
+                            user_input = input(f"\n{REQUEST}Are you sure that you want to remove the container{RESET} {INPUT}[{args.container_name}]{RESET} {REQUEST}(y/n)?:{RESET}").strip().lower()
 
                             if user_input in ["y", "yes"]:                          
-                                print(f"{RED}WARNING!!: All running processes of the selected container will be terminated.{RESET}")
+                                #print(f"\n{INFO}All running processes of the selected container will be terminated.{RESET}")
                                 break
                             elif user_input in ["n", "no"]:
                                 exit(1)
                             else:
-                                print(f"{RED}\nInvalid input. Please use y(yes) or n(no).{RESET}")  
+                                print(f"{ERROR}\nInvalid input. Please use y(yes) or n(no).{RESET}")  
                 else:
-                    print(f"{RED}ERROR!!: [{args.container_name}] does not exist. {RESET}")
+                    print(f"\n{INPUT}[{args.container_name}]{RESET} {ERROR}does not exist.")
+                    if no_running_container_number == 0:
+                        show_container_info(False)
+                        exit(1)
                     while True:
                         # ToDo: create a function ( the same 4 lines as below)
-                        print(f"{GREEN}Only the following no-running containers of the current user can be removed:{RESET} ")
+                        print(f"\n{INFO}Only the following no-running containers of the current user can be removed:{RESET} ")
                         print_existing_container_list(no_running_containers)
-                        #print(f"{RED}WARNING!!: All running processes of the selected container will be terminated and you will NOT ask again. Be sure about your decision.{RESET}")
+                        #print(f"{ERROR} All running processes of the selected container will be terminated and you will NOT ask again. Be sure about your decision.{RESET}")
                         selected_container_name, selected_container_position = select_container(no_running_containers)
-                        print(f"{GREEN}Selected container to be removed:{RESET} {selected_container_name}")    
+                        print(f"\n{INFO}Selected container to be removed:{RESET} {selected_container_name}")    
                         break                      
             else:    
                 print(
-                    "\n" +\
-                    f"{GREEN}Info{RESET}: \
-                    \nRemove an existing and not running machine learning container.  \
-                    \n{GREEN}Correct Usage{RESET}: \
-                    \nmlc remove <container_name>  \
-                    \n{GREEN}Example{RESET}: \
-                    \nmlc remove pt231aime\n"
+                    "\n" + '#'*100 + "\n" \
+                    f"\t{INFO}Info{RESET}: \
+                    \n\tRemove an existing and not running machine learning container.  \
+                    \n\t{INFO}Correct Usage{RESET}: \
+                    \n\tmlc remove <container_name>  \
+                    \n\t{INFO}Example{RESET}: \
+                    \n\tmlc remove pt231aime\n" + '#'*100
                 )    
 
                 # ToDo: create a function ( the same 4 lines as below)
-                print(f"{GREEN}The following not running containers of the current user can be removed:{RESET}")
+                print(f"\n{INFO}The following not running containers of the current user can be removed:{RESET}")
                 print_existing_container_list(no_running_containers)
-                #print(f"{RED}WARNING!!: All running processes of the selected container will be terminated.{RESET}")
+                print(f"\n{WARNING}Caution: After your selection, there is no option to recover the container. Be sure about your decision.{RESET}")
                 selected_container_name, selected_container_position = select_container(no_running_containers)
-                print(f"{GREEN}Selected container to be removed:{RESET} {selected_container_name}")  
+                print(f"\n{INFO}Selected container to be removed:{RESET} {selected_container_name}")  
             
             # Obtain container_tag from the selected container name
             selected_container_tag = no_running_container_tags[selected_container_position-1]
-            print("Estoy aqui")
+
             '''
             # Get the image associated with the container
             docker_command_get_image = [
@@ -1388,18 +1444,22 @@ def main():
             #exit_code = process.returncode
             
             #container_image = get_container_image(selected_container_tag)
-            print(f"container_image: {container_image}")
+            #print(f"container_image: {container_image}")
             # Delete the container
-            print("\nDeleting container ...")
+            print(f"\n{INPUT}[{selected_container_name}]{RESET} {INFO}deleting container ...{RESET}")
+            #print("1")
             docker_command_delete_container = f"docker container rm {selected_container_tag}"
-            subprocess.Popen(docker_command_delete_container, shell=True).wait()
-            
+            #print("2")
+            subprocess.Popen(docker_command_delete_container, shell=True, text=True, stdout=subprocess.PIPE).wait()
+            #process_del_cont = 
+            #_, _ = process_del_cont.communicate()  # Communicate handles interactive input/output
+            #print("3")
             # Delete the container's image
-            print("Deleting container image ...")
+            print(f"\n{INFO}Deleting related image ...{RESET}")
             docker_command_rm_image = f"docker image rm {container_image}"            
             subprocess.Popen(docker_command_rm_image, shell=True).wait()
 
-            print(f"\n[{selected_container_name}] container removed.\n") 
+            print(f"\n{INPUT}[{selected_container_name}]{RESET} {INFO}container removed.{RESET}\n") 
             
             
         if args.command == 'start':
@@ -1407,42 +1467,141 @@ def main():
             # List existing containers of the current user
             available_user_containers, available_user_container_tags = existing_user_containers(user_name, args.command)
             
+            ### ADDED
+            containers_state = [True if container_tag == check_container_running(container_tag) else False for container_tag in available_user_container_tags]
+            # Automate filtering            
+            no_running_containers, no_running_container_tags = filter_running_containers(
+                containers_state,
+                False, 
+                available_user_containers, 
+                available_user_container_tags
+            )
+            running_containers, running_container_tags = filter_running_containers(
+                containers_state,
+                True, 
+                available_user_containers, 
+                available_user_container_tags
+            )
+            available_container_number = len(available_user_containers)
+            running_container_number = len(running_containers)
+            no_running_container_number = len(no_running_containers)
+            
+            ### ADDED
+            
+            if args.container_name: 
+                if args.container_name in running_containers:
+                    if no_running_container_number == 0:
+                        print(
+                            #f"{ERROR}\nThere are only running containers ({running_container_number}) or not containers at all.\n\nYou cannot remove running containers.{RESET}{INFO}\n\nHere an overview of current containers:{RESET}"
+                            #f"{ERROR}\nYou cannot start running containers.{RESET}{INFO}"
+                            f"{ERROR}\nAt the moment all containers are running.\nCreate a new one and start it using: mlc start container_name.{RESET}{INFO}"
+
+                    )
+                        show_container_info(True) 
+                        exit(1)
+                    print(f"\n{ERROR}The provided container{RESET} {INPUT}[{args.container_name}]{RESET} {ERROR}exists and is running. Not possible to be started.{RESET}")
+                    # ToDo: create a function ( the same 4 lines as below)
+                    print(f"\n{INFO}Only the following no-running containers of the current user can be started:{RESET} ")
+                    print_existing_container_list(no_running_containers)
+                    #print(f"{ERROR} All running processes of the selected container will be terminated and you will NOT ask again. Be sure about your decision.{RESET}")
+                    selected_container_name, selected_container_position = select_container(no_running_containers)
+                    print(f"{INFO}Selected container to be started:{RESET} {selected_container_name}")                            
+                elif args.container_name in no_running_containers:
+
+                    selected_container_name = args.container_name
+                    selected_container_position = no_running_containers.index(args.container_name) + 1
+                    print(f'\n{INPUT}[{args.container_name}]{RESET} {INFO}is not running and will be started.{RESET}')
+                    '''
+                    if not args.force_remove:
+                        
+                        print(f"\n{HINT}Hint: use the flag -fr or --force_remove to avoid be asked.{RESET}")
+
+                        while True:
+                            
+                            print(f"\n{WARNING}Caution: After your selection, there is no option to recover the container. Be sure about your decision.{RESET}")
+
+                            user_input = input(f"\n{REQUEST}Are you sure that you want to remove the container{RESET} {INPUT}[{args.container_name}]{RESET} {REQUEST}(y/n)?:{RESET}").strip().lower()
+
+                            if user_input in ["y", "yes"]:                          
+                                #print(f"\n{INFO}All running processes of the selected container will be terminated.{RESET}")
+                                break
+                            elif user_input in ["n", "no"]:
+                                exit(1)
+                            else:
+                                print(f"{ERROR}\nInvalid input. Please use y(yes) or n(no).{RESET}")  
+                    '''
+                else:
+                    print(f"\n{INPUT}[{args.container_name}]{RESET} {ERROR}does not exist.")
+                    if no_running_container_number == 0:
+                        show_container_info(False)
+                        exit(1)
+                    while True:
+                        # ToDo: create a function ( the same 4 lines as below)
+                        print(f"\n{INFO}Only the following no-running containers of the current user can be started:{RESET} ")
+                        print_existing_container_list(no_running_containers)
+                        #print(f"{ERROR} All running processes of the selected container will be terminated and you will NOT ask again. Be sure about your decision.{RESET}")
+                        selected_container_name, selected_container_position = select_container(no_running_containers)
+                        print(f"\n{INFO}Selected container to be started:{RESET} {selected_container_name}")    
+                        break                      
+            else:    
+                print(
+                    "\n" + '#'*100 + "\n" \
+                    f"\t{INFO}Info{RESET}: \
+                    \n\tStart an existing machine learning container.  \
+                    \n\t{INFO}Correct Usage{RESET}: \
+                    \n\tmlc start <container_name>  \
+                    \n\t{INFO}Example{RESET}: \
+                    \n\tmlc start pt231aime\n" + '#'*100
+                )   
+
+                # ToDo: create a function ( the same 4 lines as below)
+                print(f"\n{INFO}The following not running containers of the current user can be started:{RESET}")
+                print_existing_container_list(no_running_containers)
+                selected_container_name, selected_container_position = select_container(no_running_containers)
+                print(f"\n{INFO}Selected container to be started:{RESET} {selected_container_name}")  
+            
+            # Obtain container_tag from the selected container name
+            selected_container_tag = no_running_container_tags[selected_container_position-1]
+            
+            
+            ##### OLD VERSION
+            '''
             if args.container_name:     
                 if args.container_name not in available_user_containers:
-                    print(f"No containers found matching the name '{args.container_name}' for the current user.")
+                    print(f"\n{ERROR}No containers found matching the name{RESET} {INPUT}[{args.container_name}]{RESET} {ERROR}for the current user.{RESET}")
                     # ToDo: create a function ( the same 4 lines as below)
-                    print(f"{GREEN}Available containers of the current user:{RESET}")
+                    print(f"\n{INFO}Available containers of the current user:{RESET}")
                     print_existing_container_list(available_user_containers)
                     selected_container_name, selected_container_position = select_container(available_user_containers)
-                    print(f"{GREEN}Selected container to be started:{RESET} {selected_container_name}")                            
+                    print(f"\n{INFO}Selected container to be started:{RESET} {INPUT}{selected_container_name}{RESET}")                            
                 else:
                     selected_container_name = args.container_name
                     selected_container_position = available_user_containers.index(args.container_name) + 1
                     #print(f'Provided container name [{args.container_name}] exists and will be started.')                   
             else:
                 print(
-                    "\n" +\
-                    f"{GREEN}Info{RESET}: \
-                    \nStart an existing machine learning container.  \
-                    \n{GREEN}Correct Usage{RESET}: \
-                    \nmlc start <container_name>  \
-                    \n{GREEN}Example{RESET}: \
-                    \nmlc start pt231aime\n"
+                    "\n" + '#'*100 + "\n" \
+                    f"\t{INFO}Info{RESET}: \
+                    \n\tStart an existing machine learning container.  \
+                    \n\t{INFO}Correct Usage{RESET}: \
+                    \n\tmlc start <container_name>  \
+                    \n\t{INFO}Example{RESET}: \
+                    \n\tmlc start pt231aime\n" + '#'*100
                 )
 
                 # ToDo: create a function ( the same 4 lines as above)
-                print(f"{GREEN}Available containers of the current user:{RESET}")
+                print(f"\n{INFO}Available containers of the current user:{RESET}")
                 print_existing_container_list(available_user_containers)
                 selected_container_name, selected_container_position = select_container(available_user_containers)
-                print(f"{GREEN}Selected container to be started:{RESET} {selected_container_name}")
+                print(f"\n{INFO}Selected container to be started:{RESET} {INPUT}{selected_container_name}")
             
             # Obtain container_tag from the selected container name
             selected_container_tag = available_user_container_tags[selected_container_position-1]
             #print(f"Container_tag: {selected_container_tag}")
-            
+            '''
             # Start the existing selected container:
             if selected_container_tag != check_container_running(selected_container_tag):
-                print(f"[{selected_container_name}] starting container...")
+                print(f"\n{INPUT}[{selected_container_name}]{RESET} {INFO}starting container...{RESET}")
                 #docker_command = f"docker container start {selected_container_tag}"
                 docker_command_start = [
                     "docker",
@@ -1465,11 +1624,11 @@ def main():
                 #print(f"exit_code: {exit_code}")
                 #_, _, _ = run_docker_command(docker_command)
                 if out == selected_container_tag:
-                    print(f"[{selected_container_name}] container started.\n\nTo open a shell to container use: mlc open {selected_container_name}")
+                    print(f"\n{INPUT}[{selected_container_name}]{RESET} {INFO}container started.\n\nTo open a shell within the container, use: mlc open{RESET} {INPUT}{selected_container_name}{RESET}\n")
                 else:
-                    print(f"{RED}ERROR!![{selected_container_name}] Error Starting Container.{RESET}")
+                    print(f"\n{INPUT}[{selected_container_name}]{RESET} {ERROR}Error Starting Container.{RESET}")
             else:
-                print(f"[{selected_container_name}] container already running")
+                print(f"\n{INPUT}[{selected_container_name}]{RESET} {INFO}container already running.{RESET}\n")
                 sys.exit(-1)
 
 
@@ -1529,7 +1688,7 @@ def main():
             # Print the final processed output
             # Define an output format string with specified widths
             format_string = "{:<15}{:<30}{:<15}{:<30}{:<30}"
-            print(f"\n{GREEN}Available ml-containers are:{RESET}\n")
+            print(f"\n{INFO}Available ml-containers are:{RESET}\n")
             titles = ["CONTAINER", "SIZE", "USER", "FRAMEWORK", "STATUS"]
             print(format_string.format(*titles))
             #print("\t".join(titles))
@@ -1601,6 +1760,8 @@ def main():
             '''
         if args.command == 'stop':
 
+            '''
+            ## OLD VERSION
             # List existing containers of the current user
             available_user_containers, available_user_container_tags = existing_user_containers(user_name, args.command)
             containers_state = [True if container_tag == check_container_running(container_tag) else False for container_tag in available_user_container_tags]
@@ -1614,68 +1775,250 @@ def main():
 
             # check that at least 1 container is running
             if not running_container_tags:
-                print(f"{RED}WARNING!!: No containers are running and therefore there are no one to be stopped.{RESET}")
+                print(f"\n{ERROR}All containers are stopped. Therefore there are no one to be stopped.{RESET}\n")
                 exit(1)
             
             if args.container_name: 
                 if args.container_name not in running_containers:
-                    print("{RED}The provided container [{args.container_name}] is not running.{RESET}")
+                    print(f"\n{ERROR}You cannot stop a non-running container{RESET} {INPUT}[{args.container_name}].{RESET}")
                     # ToDo: create a function ( the same 4 lines as below)
-                    print(f"{GREEN}Running containers of the current user:{RESET}")
+                    print(f"\n{INFO}Running containers of the current user:{RESET}")
                     print_existing_container_list(running_containers)
-                    print(f"{RED}WARNING!!: All running processes of the selected container will be terminated and you will NOT ask again. Be sure about your decision.{RESET}")
+                    print(f"\n{WARNING}Caution: all running processes of the selected container will be terminated and you will NOT ask again. Be sure about your decision.{RESET}")
                     selected_container_name, selected_container_position = select_container(running_containers)
-                    print(f"{GREEN}Selected container to be stopped:{RESET} {selected_container_name}")                            
+                    print(f"\n{INFO}Selected container to be stopped:{RESET} {INPUT}{selected_container_name}{RESET}")                            
                 else:
                     selected_container_name = args.container_name
                     selected_container_position = running_containers.index(args.container_name) + 1
-                    print(f'\n[{args.container_name}] is running and will be stopped.')
+                    print(f'\n{INPUT}[{args.container_name}]{RESET} {INFO}is running and will be stopped.{RESET}')
                     if not args.force_stop:
                         
-                        print(f"\n\nHint: use the flag -fs or --force_stop to avoid be asked.")
+                        print(f"\n{HINT}Hint: use the flag -fs or --force_stop to avoid be asked.{RESET}")
 
                         while True:
                             
-                            user_input = input(f"\n\nAre you sure that you want to stop the container [{args.container_name}]? (y/n): ").strip().lower()
+                            print(f"\n{WARNING}Caution: all running processes of the selected container will be terminated and you will NOT ask again. Be sure about your decision.{RESET}")
+
+                            user_input = input(f"\n{INFO}Are you sure that you want to stop the container{RESET} {INPUT}[{args.container_name}]{RESET} {INFO}(y/n)?:{RESET}").strip().lower()
 
                             if user_input in ["y", "yes"]:                          
-                                print(f"{RED}WARNING!!: All running processes of the selected container will be terminated.{RESET}")
+                                print(f"\n{INFO}All running processes of the selected container will be terminated.{RESET}")
                                 break
                             elif user_input in ["n", "no"]:
                                 exit(1)
                             else:
-                                print(f"{RED}\nInvalid input. Please use y(yes) or n(no).{RESET}")                                                    
+                                print(f"{ERROR}\nInvalid input. Please use y(yes) or n(no).{RESET}")                                                    
             else:    
                 print(
-                    "\n" +\
-                    f"{GREEN}Info{RESET}: \
-                    \nStop an existing machine learning container.  \
-                    \n{GREEN}Correct Usage{RESET}: \
-                    \nmlc stop <container_name>  \
-                    \n{GREEN}Example{RESET}: \
-                    \nmlc stop pt231aime\n"
+                    "\n" + '#'*100 + "\n" \
+                    f"\t{INFO}Info{RESET}: \
+                    \n\tStop an existing machine learning container.  \
+                    \n\t{INFO}Correct Usage{RESET}: \
+                    \n\tmlc stop <container_name>  \
+                    \n\t{INFO}Example{RESET}: \
+                    \n\tmlc stop pt231aime\n" + '#'*100
                 )    
 
                 # ToDo: create a function ( the same 4 lines as below)
-                print(f"{GREEN}Running containers of the current user:{RESET}")
+                print(f"\n{INFO}Running containers of the current user:{RESET}")
                 print_existing_container_list(running_containers)
-                print(f"{RED}WARNING!!: All running processes of the selected container will be terminated.{RESET}")
+                print(f"\n{WARNING}Caution: all running processes of the selected container will be terminated.{RESET}")
                 selected_container_name, selected_container_position = select_container(running_containers)
-                print(f"{GREEN}Selected container to be stopped:{RESET} {selected_container_name}")  
+                print(f"\n{INFO}Selected container to be stopped:{RESET} {selected_container_name}")  
+            
+            # Obtain container_tag from the selected container name
+            selected_container_tag = running_container_tags[selected_container_position-1]
+            '''
+            ## "REMOVE" VERSION
+            # List existing containers of the current user
+            available_user_containers, available_user_container_tags = existing_user_containers(user_name, args.command)
+            containers_state = [True if container_tag == check_container_running(container_tag) else False for container_tag in available_user_container_tags]
+            
+            # Automate filtering
+            no_running_containers, no_running_container_tags = filter_running_containers(
+                containers_state,
+                False, 
+                available_user_containers, 
+                available_user_container_tags
+            )       
+                     
+            running_containers, running_container_tags = filter_running_containers(
+                containers_state,
+                True, 
+                available_user_containers, 
+                available_user_container_tags
+            )
+                      
+            no_running_container_number = len(no_running_containers)
+            running_container_number = len(running_containers)
+            # check that at least 1 container is running
+            #if not running_container_tags:
+            #    print(f"\n{ERROR}All containers are stopped. Therefore there are no one to be stopped.{RESET}\n")
+            #    exit(1)
+            
+            if args.container_name: 
+                if args.container_name in no_running_containers:
+                    if running_container_number == 0:
+                        print(
+                            #f"{ERROR}\nThere are only running containers ({running_container_number}) or not containers at all.\n\nYou cannot remove running containers.{RESET}{INFO}\n\nHere an overview of current containers:{RESET}"
+                            f"{ERROR}\nAll containers are stopped. You cannot stop no-running containers.{RESET}"
+                       )
+                        show_container_info(False) 
+                        exit(1)
+                    print(f"\n{ERROR}The provided container{RESET} {INPUT}[{args.container_name}]{RESET} {ERROR}exists but is not running. Not possible to be stopped.{RESET}")
+                    # ToDo: create a function ( the same 4 lines as below)
+                    print(f"\n{INFO}Only the following running containers of the current user can be stopped:{RESET} ")
+                    print_existing_container_list(running_containers)
+                    #print(f"{ERROR} All running processes of the selected container will be terminated and you will NOT ask again. Be sure about your decision.{RESET}")
+                    selected_container_name, selected_container_position = select_container(running_containers)
+                    print(f"{INFO}Selected container to be stopped:{RESET} {selected_container_name}")                            
+                elif args.container_name in running_containers:
+                    selected_container_name = args.container_name
+                    selected_container_position = running_containers.index(args.container_name) + 1
+                    print(f'\n{INPUT}[{args.container_name}]{RESET} {INFO}is running and will be stopped.{RESET}')
+                    if not args.force_stop:
+                        
+                        print(f"\n{HINT}Hint: use the flag -fs or --force_stop to avoid be asked.{RESET}")
+
+                        while True:
+                            
+                            print(f"\n{WARNING}Caution: all running processes of the selected container will be terminated and you will NOT ask again. Be sure about your decision.{RESET}")
+
+                            user_input = input(f"\n{INFO}Are you sure that you want to stop the container{RESET} {INPUT}[{args.container_name}]{RESET} {INFO}(y/n)?:{RESET}").strip().lower()
+
+                            if user_input in ["y", "yes"]:                          
+                                print(f"\n{INFO}All running processes of the selected container will be terminated.{RESET}")
+                                break
+                            elif user_input in ["n", "no"]:
+                                exit(1)
+                            else:
+                                print(f"{ERROR}\nInvalid input. Please use y(yes) or n(no).{RESET}") 
+                else:
+                    
+                    print(f"\n{INPUT}[{args.container_name}]{RESET} {ERROR}does not exist.\n")
+                    
+                    # all containers are running
+                    if no_running_container_number == 0:
+                        while True:
+                            # ToDo: create a function ( the same 4 lines as below)
+                            print(f"\n{INFO}Only the following running containers of the current user can be stopped:{RESET} ")
+                            print_existing_container_list(running_containers)
+                            print(f"\n{WARNING}Caution: all running processes of the selected container will be terminated and you will NOT ask again. Be sure about your decision.{RESET}")
+                            selected_container_name, selected_container_position = select_container(running_containers)
+                            print(f"\n{INFO}Selected container to be stopped:{RESET} {selected_container_name}")    
+                            break 
+                    else:
+                        exit(1)
+                    
+            else:    
+                # check that at least 1 container is running
+                if not running_container_tags:
+                    print(f"\n{ERROR}All containers are stopped. Therefore there are no one to be stopped.{RESET}")
+                    show_container_info(False)
+                    exit(1)
+                print(
+                    "\n" + '#'*100 + "\n" \
+                    f"\t{INFO}Info{RESET}: \
+                    \n\tStop an existing machine learning container.  \
+                    \n\t{INFO}Correct Usage{RESET}: \
+                    \n\tmlc stop <container_name>  \
+                    \n\t{INFO}Example{RESET}: \
+                    \n\tmlc stop pt231aime\n" + '#'*100
+                )    
+                # ToDo: create a function ( the same 4 lines as below)
+                print(f"\n{INFO}Running containers of the current user:{RESET}")
+                print_existing_container_list(running_containers)
+                print(f"\n{WARNING}Caution: all running processes of the selected container will be terminated.{RESET}")
+                selected_container_name, selected_container_position = select_container(running_containers)
+                print(f"\n{INFO}Selected container to be stopped:{RESET} {INPUT}{selected_container_name}{RESET}")  
             
             # Obtain container_tag from the selected container name
             selected_container_tag = running_container_tags[selected_container_position-1]
             
-            print(f"\n[{selected_container_name}] Stopping container ...")
+            # CONTINUATION OLD VERSION        
+            
+            print(f"\n{INPUT}[{selected_container_name}]{RESET} {INFO}stopping container ...{RESET}")
             # Attempt to stop the container and store the result.
             docker_command_stop = f"docker container stop {selected_container_tag}"
             _, _, _ = run_docker_command(docker_command_stop)
             # Print a message indicating the container has been stopped.
-            print(f"[{selected_container_name}] container stopped.\n")
-      
+            print(f"\n{INPUT}[{selected_container_name}]{RESET} {INFO}container stopped.{RESET}\n")
+
+        if args.command == 'update-sys':
+            # Set to False initially
+            #to_be_updated_directly = False
+
+            # Get the directory of the current script
+            mlc_path = os.path.dirname(os.path.abspath(__file__))
+            
+            # Change the current directory to MLC_PATH
+            os.chdir(mlc_path)
+            
+            # Check if the .git directory exists
+            if not os.path.isdir(f"{mlc_path}/.git"):
+                print(f"{ERROR}Failed: ML container system not installed as updatable git repo.\nAdd the mlc's location to ~/.bashrc or change to the location of the mlc. {RESET}")
+                sys.exit(-1)  # Exit if the directory is not a git repo
+                        
+            # Determine if sudo is required for git operations
+            sudo = "sudo"
+            if os.access(f"{mlc_path}/.git", os.W_OK):
+                sudo = ""  # No sudo if the git directory is writable
+            # Fix for "unsafe repository" warning in Git adding the mlc-directory to the list of safe directories
+            docker_command_git_config = ["git", "config", "--global", "--add", "safe.directory", mlc_path]
+            subprocess.run(docker_command_git_config)
+
+            # Get the current branch name
+            docker_command_current_branch = ["git", "symbolic-ref", "HEAD"]
+            branch = subprocess.check_output(docker_command_current_branch, universal_newlines=True).strip().split("/")[-1]
+            
+            if not args.force_update:
+                        
+                print(f"\n{HINT}Hint: use the flag -fu or --force_update to avoid be asked.{RESET}")
+                
+                print(f"\n{INFO}This will update the ML container system to the latest version.{RESET}")
+
+                # If sudo is required, ask if the user wants to check for updates
+                if sudo == "":
+                    reply = input(f"\n{REQUEST}Check for available updates (y/n)?:{RESET}").strip().lower()
+                    if reply not in ["y", "yes"]:
+                        sys.exit(0)  # Exit if user does not want to check for updates
+
+                # Fetch the latest updates from remote repo
+                docker_command_git_remote = ["git", "remote", "update"]
+                sudo and docker_command_git_remote.insert(0, sudo)
+                subprocess.run(docker_command_git_remote)
+                
+                # Get the update log for commits that are new in the remote repo
+                docker_command_git_log = ["git", "log", f"HEAD..origin/{branch}", "--pretty=format:%s"]
+                sudo and docker_command_git_log.insert(0, sudo)
+                update_log = subprocess.check_output(docker_command_git_log, text=True).strip()
+                
+                if update_log == "":
+                    print(f"\n{INFO}ML container system is up to date.\n{RESET}")
+                    sys.exit(-1)  # Exit if no updates are available
+                
+                # Print the update log and prompt the user to confirm update
+                print(f"\n{INFO}Update(s) available.\n\nChange Log:\n{update_log}{RESET}")
+                reply = input(f"\n{INFO}Update ML container system? (y/n){RESET}").strip().lower()
+                if reply in ["y", "yes"]:
+                    args.update_directly = True  # Set confirmed to True if user agrees to update
+                else:
+                    sys.exit(0)  # Exit if user does not want to update
+                
+           # If confirmed, proceed with the update
+            try:
+                print(f"\n{INFO}Updating ML container system...{RESET}\n")
+                # Pull the latest changes from the remote repo
+                docker_command_git_pull = ["git", "pull", "origin", branch]
+                sudo and docker_command_git_pull.insert(0, sudo)          
+                subprocess.run(docker_command_git_pull)
+                sys.exit(1)  # Exit after successful update
+            except Exception as e:
+                print(f"\n{ERROR}Error during update: {e}")
+                sys.exit(-1)  # Exit with an error if update fails
 
     except KeyboardInterrupt:
-        print(f"\n{RED}WARNING!!: Running process cancelled by the user{RESET}")
+        print(f"\n{ERROR}\nRunning process cancelled by the user{RESET}.\n")
    
            
             

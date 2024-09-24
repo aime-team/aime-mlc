@@ -7,4 +7,4 @@
 # This software may be used and distributed according to the terms of the MIT LICENSE 
 
 # Run the second script using the forwarded arguments
-mlc.sh start $@
+mlc list $@

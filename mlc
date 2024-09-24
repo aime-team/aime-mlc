@@ -6,7 +6,12 @@
 # 
 # This software may be used and distributed according to the terms of the MIT LICENSE 
 
-# Run the second script using the forwarded arguments
-mlc.sh open $@
+# Save all arguments in a variable
+all_args=$@
+# Obtain the location of the mlc file
+MLC_PATH=$(dirname $0)
+
+# Pass the arguments to the Python script
+python3 "$MLC_PATH/mlc.py" $all_args
 
 

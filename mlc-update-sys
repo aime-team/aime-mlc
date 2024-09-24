@@ -6,10 +6,5 @@
 # 
 # This software may be used and distributed according to the terms of the MIT LICENSE 
 
-# Save all arguments in a variable
-all_args=$@
-
-# Pass the arguments to the Python script
-python3 mlc.py $all_args
-
-
+# Run the second script using the forwarded arguments
+mlc update-sys $@
