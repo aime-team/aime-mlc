@@ -564,6 +564,6 @@ After that, to reclaim the disk space allocated by Docker and release the cached
 
 ```
 
-'docker image prune --all'
+docker image prune --all
 
 ```
