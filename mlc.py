@@ -855,7 +855,7 @@ def main():
                     \n\t{INFO}Correct Usage{RESET}: \
                     \n\tmlc create <container_name> <framework_name> <framework_version> -w /home/$USER/workspace -d /data -ng 1 \
                     \n\t{INFO}Example{RESET}: \
-                    \n\tmlc create pt231aime Pytorch 2.3.1-aime\n" + '#'*100
+                    \n\tmlc create pt231aime Pytorch 2.3.1-aime -w /home/user_anme/workspace -d /data -ng 1\n" + '#'*100
                 )                
 
             # User provides the container name and is validated
@@ -1180,6 +1180,73 @@ def main():
         if args.command == 'import':
             print(f"\n{INFO}Not yet implemented. Coming soon!{RESET}\n")
             
+            
+        if args.command == 'list':            
+    
+                show_container_info(args.all)
+                '''
+                # Adapt the filter to the selected flags (no flag or --all)
+                filter_aime_mlc_user =  "label=aime.mlc" if args.all else f"label=aime.mlc={user_name}"
+                #ERROR: docker_command_ls = f"docker container ls -a --filter{filter_aime_mlc_user} --format {{json .}}'"
+                #print(f"filter_aime_mlc_user: {filter_aime_mlc_user}")
+                docker_command_ls = [
+                    "docker", "container", 
+                    "ls", 
+                    "-a", 
+                    "--filter", filter_aime_mlc_user, 
+                    "--format", '{{json .}}'    
+                ]
+                #print(f"docker_command_ls: {docker_command_ls}")
+                # Initialize Popen to run the docker command with JSON output
+                process = subprocess.Popen(
+                    docker_command_ls, 
+                    shell=False,
+                    text=True,
+                    stdout=subprocess.PIPE,  # Capture stdout
+                    stderr=subprocess.PIPE    # Capture stderr
+                )
+                
+                # Communicate with the process to get output and errors
+                stdout_data, stderr_data = process.communicate()        
+                stdout_data = str(stdout_data.strip())
+
+                # Check for any errors
+                if process.returncode != 0:
+                    print(f"Error: {stderr_data}")
+                else:
+                    # Split into individual lines and process them as JSON objects
+                    output_lines = []
+                    try:
+                        # Split by newlines and parse each line as JSON
+                        json_lines = stdout_data.split('\n') #list
+                        #print(len(json_lines))
+                        #print(f"type jsonlines[0]: {type(json_lines[0])}")
+                        #print(f"jsonlines: {json_lines}")
+                        containers_info = [json.loads(line) for line in json_lines if line]
+                        #print(f"type containers_info[0]: {type(containers_info[0])}")
+                        #print(f"containers_info: {containers_info}")
+                        #print(len(containers_info))
+
+                        # Apply formatting to all containers' info
+                        output_lines = list(map(format_container_info, containers_info))
+                
+                    except json.JSONDecodeError:
+                        print("Failed to decode JSON output.")
+                    except KeyError as e:
+                        print(f"Missing expected key: {e}")
+                # Print the final processed output
+                # Define an output format string with specified widths
+                format_string = "{:<15}{:<30}{:<15}{:<30}{:<30}"
+                print(f"\n{INFO}Available ml-containers are:{RESET}\n")
+                titles = ["CONTAINER", "SIZE", "USER", "FRAMEWORK", "STATUS"]
+                print(format_string.format(*titles))
+                #print("\t".join(titles))
+                #print("\n".join(output_lines))
+                # Print the container info
+                print("\n".join(format_string.format(*info) for info in output_lines)+"\n")
+                #print("")
+                '''                     
+            
         if args.command == 'open':           
             
             # List existing containers of the current user
@@ -1311,7 +1378,6 @@ def main():
                 available_user_containers, 
                 available_user_container_tags
             )
-            available_container_number = len(available_user_containers)
             running_container_number = len(running_containers)
             no_running_container_number = len(no_running_containers)
 
@@ -1377,9 +1443,11 @@ def main():
                                 print(f"{ERROR}\nInvalid input. Please use y(yes) or n(no).{RESET}")  
                 else:
                     print(f"\n{INPUT}[{args.container_name}]{RESET} {ERROR}does not exist.")
+                    
+                    # all containers are running
                     if no_running_container_number == 0:
                         show_container_info(False)
-                        exit(1)
+                        exit(1) 
                     while True:
                         # ToDo: create a function ( the same 4 lines as below)
                         print(f"\n{INFO}Only the following no-running containers of the current user can be removed:{RESET} ")
@@ -1387,16 +1455,23 @@ def main():
                         #print(f"{ERROR} All running processes of the selected container will be terminated and you will NOT ask again. Be sure about your decision.{RESET}")
                         selected_container_name, selected_container_position = select_container(no_running_containers)
                         print(f"\n{INFO}Selected container to be removed:{RESET} {selected_container_name}")    
-                        break                      
+                        break       
+                    
+                                      
             else:    
+                # check that at least 1 container is not-running
+                if no_running_container_number == 0:
+                    print(f"\n{ERROR}All containers are running.\nIf you want to remove a container, stop it before with: mlc stop container_name.{RESET}")
+                    show_container_info(False)
+                    exit(1)
                 print(
                     "\n" + '#'*100 + "\n" \
                     f"\t{INFO}Info{RESET}: \
                     \n\tRemove an existing and not running machine learning container.  \
                     \n\t{INFO}Correct Usage{RESET}: \
-                    \n\tmlc remove <container_name>  \
+                    \n\tmlc remove <container_name>  [-fr | --force_remove]\
                     \n\t{INFO}Example{RESET}: \
-                    \n\tmlc remove pt231aime\n" + '#'*100
+                    \n\tmlc remove pt231aime [-fr | --force_remove]\n" + '#'*100
                 )    
 
                 # ToDo: create a function ( the same 4 lines as below)
@@ -1482,7 +1557,6 @@ def main():
                 available_user_containers, 
                 available_user_container_tags
             )
-            available_container_number = len(available_user_containers)
             running_container_number = len(running_containers)
             no_running_container_number = len(no_running_containers)
             
@@ -1631,72 +1705,6 @@ def main():
                 print(f"\n{INPUT}[{selected_container_name}]{RESET} {INFO}container already running.{RESET}\n")
                 sys.exit(-1)
 
-
-        if args.command == 'list':            
- 
-            show_container_info(args.all)
-            '''
-            # Adapt the filter to the selected flags (no flag or --all)
-            filter_aime_mlc_user =  "label=aime.mlc" if args.all else f"label=aime.mlc={user_name}"
-            #ERROR: docker_command_ls = f"docker container ls -a --filter{filter_aime_mlc_user} --format {{json .}}'"
-            #print(f"filter_aime_mlc_user: {filter_aime_mlc_user}")
-            docker_command_ls = [
-                "docker", "container", 
-                "ls", 
-                "-a", 
-                "--filter", filter_aime_mlc_user, 
-                "--format", '{{json .}}'    
-            ]
-            #print(f"docker_command_ls: {docker_command_ls}")
-            # Initialize Popen to run the docker command with JSON output
-            process = subprocess.Popen(
-                docker_command_ls, 
-                shell=False,
-                text=True,
-                stdout=subprocess.PIPE,  # Capture stdout
-                stderr=subprocess.PIPE    # Capture stderr
-            )
-            
-            # Communicate with the process to get output and errors
-            stdout_data, stderr_data = process.communicate()        
-            stdout_data = str(stdout_data.strip())
-
-            # Check for any errors
-            if process.returncode != 0:
-                print(f"Error: {stderr_data}")
-            else:
-                # Split into individual lines and process them as JSON objects
-                output_lines = []
-                try:
-                    # Split by newlines and parse each line as JSON
-                    json_lines = stdout_data.split('\n') #list
-                    #print(len(json_lines))
-                    #print(f"type jsonlines[0]: {type(json_lines[0])}")
-                    #print(f"jsonlines: {json_lines}")
-                    containers_info = [json.loads(line) for line in json_lines if line]
-                    #print(f"type containers_info[0]: {type(containers_info[0])}")
-                    #print(f"containers_info: {containers_info}")
-                    #print(len(containers_info))
-
-                    # Apply formatting to all containers' info
-                    output_lines = list(map(format_container_info, containers_info))
-              
-                except json.JSONDecodeError:
-                    print("Failed to decode JSON output.")
-                except KeyError as e:
-                    print(f"Missing expected key: {e}")
-            # Print the final processed output
-            # Define an output format string with specified widths
-            format_string = "{:<15}{:<30}{:<15}{:<30}{:<30}"
-            print(f"\n{INFO}Available ml-containers are:{RESET}\n")
-            titles = ["CONTAINER", "SIZE", "USER", "FRAMEWORK", "STATUS"]
-            print(format_string.format(*titles))
-            #print("\t".join(titles))
-            #print("\n".join(output_lines))
-            # Print the container info
-            print("\n".join(format_string.format(*info) for info in output_lines)+"\n")
-            #print("")
-            '''
 
         if args.command == 'stats':
             
@@ -1921,9 +1929,9 @@ def main():
                     f"\t{INFO}Info{RESET}: \
                     \n\tStop an existing machine learning container.  \
                     \n\t{INFO}Correct Usage{RESET}: \
-                    \n\tmlc stop <container_name>  \
+                    \n\tmlc stop <container_name> [-fs | --force_stop]\
                     \n\t{INFO}Example{RESET}: \
-                    \n\tmlc stop pt231aime\n" + '#'*100
+                    \n\tmlc stop pt231aime [-fs | --force_stop]\n" + '#'*100
                 )    
                 # ToDo: create a function ( the same 4 lines as below)
                 print(f"\n{INFO}Running containers of the current user:{RESET}")
