@@ -855,7 +855,7 @@ def main():
                     \n\t{INFO}Correct Usage{RESET}: \
                     \n\tmlc create <container_name> <framework_name> <framework_version> -w /home/$USER/workspace -d /data -ng 1 \
                     \n\t{INFO}Example{RESET}: \
-                    \n\tmlc create pt231aime Pytorch 2.3.1-aime -w /home/user_anme/workspace -d /data -ng 1\n" + '#'*100
+                    \n\tmlc create pt231aime Pytorch 2.3.1-aime -w /home/user_name/workspace -d /data -ng 1\n" + '#'*100
                 )                
 
             # User provides the container name and is validated
@@ -915,7 +915,9 @@ def main():
                     version_number = get_user_selection(f"{REQUEST}Enter the number of your version: {RESET}", len(versions_images))
                     # Version and docker image selected
                     args.version, selected_docker_image = versions_images[version_number - 1]
+                workspace_be_asked = True
             else:
+                workspace_be_asked = False
                 available_versions = [version[0] for version in versions_images]
                 #available_versions = get_versions(versions_images)
                 #print(f"{available_versions}")
@@ -936,6 +938,43 @@ def main():
             # Default workspace directory
             default_workspace_dir = os.path.expanduser('~/workspace')
             
+            if workspace_be_asked:
+                print(f"\n{INFO}The workspace directory would be mounted by default as /workspace in the container.{RESET}")
+                print(f"{INFO}It is the directory where your project data should be stored to be accessed inside the container.{RESET}")
+                print(f"{HINT}HINT: It can be set to an existing directory with the option '-w /your_workspace'{RESET}")
+                change_workspace_dir = input(f"\n{REQUEST}Do you want to change the default workspace directory ({default_workspace_dir}), (y/n)?: {RESET}").strip()
+                # Define a variable to control breaking out of both loops
+                break_inner_loop = False
+                while True:
+                    if change_workspace_dir in ["n","no"]:
+                        print(f'\n{INFO}Workspace directory:{RESET} {INPUT}{default_workspace_dir}{RESET}')
+                        workspace_dir = default_workspace_dir
+                        break
+                    elif change_workspace_dir in ["y","yes"]:
+                        while True:
+                            # Ask the user to input the new workspace directory
+                            #provided_workspace_dir = input(f"Provide the new location of the workspace directory:").strip().lower()
+                            provided_workspace_dir = os.path.expanduser(input(f"\n{REQUEST}Provide the new location of the workspace directory:{RESET}").strip())  # Expand '~' to full path
+                            #print(f"Expanded workspace directory path: {provided_workspace_dir}")
+                            # provided_workspace_dir = input(f"Provide the new location of the workspace directory:").strip()  # Expand '~' to full path
+
+                            # Check if the provided workspace directory exist:
+                            if os.path.isdir(provided_workspace_dir):
+                                print(f'\n{INFO}Workspace directory changed to:{RESET} {INPUT}{provided_workspace_dir}{RESET}')
+                                workspace_dir = provided_workspace_dir
+                                break_inner_loop = True
+                                break
+                            else:
+                                print(f"\n{ERROR}Workspace directory not existing:{RESET} {INPUT}{provided_workspace_dir}{RESET}") 
+                        if break_inner_loop:
+                            break                           
+                    else:
+                        print(f"{ERROR}\nInvalid input. Please use y(yes) or n(no).{RESET}")
+                        break
+            else:
+                # If the -w option is not provided
+                workspace_dir = default_workspace_dir            
+          
             if args.workspace_dir:
                 # If the -w option is provided, use the user-provided path
                 provided_workspace_dir = os.path.expanduser(args.workspace_dir)
@@ -946,7 +985,35 @@ def main():
                     else:
                         print(f"\n{ERROR}Workspace directory not existing:{RESET} {INPUT}{provided_workspace_dir}{RESET}")
                         provided_workspace_dir = os.path.expanduser(input(f"\n{REQUEST}Provide the new location of the workspace directory:{RESET}").strip())
+                workspace_dir = provided_workspace_dir
                 print(f'\n{INFO}Workspace directory changed to:{RESET} {INPUT}{provided_workspace_dir}{RESET}')
+ 
+            args.workspace_dir = workspace_dir                     
+            # Check if the provided workspace directory exist:
+            if os.path.isdir(args.workspace_dir):
+                print(f"\n{INFO}/workspace will mount on:{RESET} {INPUT}{args.workspace_dir}{RESET}")
+            else:
+                print(f"\n{ERROR}Aborted.\n\nWorkspace directory not existing:{RESET} {INPUT}{args.workspace_dir}{RESET}")
+                print(f"\n{INFO}The workspace directory would be mounted as /workspace in the container.{RESET}")
+                print(f"\n{INFO}It is the directory where your project data should be stored to be accessed\ninside the container.{RESET}")
+                print(f"\n{INFO}It can be set to an existing directory with the option '-w /your_workspace'{RESET}")
+                sys.exit(-1)
+            
+            # Check if the provided data directory exist:
+            if args.data_dir:
+                data_mount = os.path.realpath(args.data_dir)
+                if os.path.isdir(data_mount):
+                    print(f"\n{INFO}/data will mount on:{RESET} {INPUT}{data_mount}{RESET}")
+                else:
+                    print(f"\n{ERROR}Aborted.\n\nData directory not existing: {data_mount}{RESET}")
+                    print(f"\n{INFO}The data directory would be mounted as /data in the container.{RESET}")
+                    print(f"\n{INFO}It is the directory where data sets, for example, mounted from\nnetwork volumes can be accessed inside the container.{RESET}")
+                    sys.exit(-1)
+            
+            print(f"\n{INFO}Selected Framework and Version:{RESET} {INPUT}{selected_framework} {selected_version}{RESET}")
+            
+            
+            '''
             else:
                 
                 # If the -w option is not provided, ask the user if they want to change the default workspace
@@ -954,8 +1021,8 @@ def main():
                 print(f"{INFO}It is the directory where your project data should be stored to be accessed inside the container.{RESET}")
                 print(f"{HINT}HINT: It can be set to an existing directory with the option '-w /your_workspace'{RESET}")
                 change_workspace_dir = input(f"\n{REQUEST}Do you want to change the default workspace directory ({default_workspace_dir}), (y/n)?: {RESET}").strip()
-                # Define a flag to control breaking out of both loops
-                break_outer_loop = False
+                # Define a variable to control breaking out of both loops
+                break_inner_loop = False
                 while True:
                     if change_workspace_dir in ["n","no"]:
                         print(f'\n{INFO}Workspace directory:{RESET} {INPUT}{default_workspace_dir}{RESET}')
@@ -971,16 +1038,63 @@ def main():
                             # Check if the provided workspace directory exist:
                             if os.path.isdir(provided_workspace_dir):
                                 print(f'\n{INFO}Workspace directory changed to:{RESET} {INPUT}{provided_workspace_dir}{RESET}')
-                                break_outer_loop = True
+                                break_inner_loop = True
                                 break
                             else:
                                 print(f"\n{ERROR}Workspace directory not existing:{RESET} {INPUT}{provided_workspace_dir}{RESET}") 
-                        if break_outer_loop:
+                        if break_inner_loop:
                             break                           
                     else:
                         print(f"{ERROR}\nInvalid input. Please use y(yes) or n(no).{RESET}")
                         break
+            
+            '''
+            '''
+            if args.workspace_dir:
+                # If the -w option is provided, use the user-provided path
+                provided_workspace_dir = os.path.expanduser(args.workspace_dir)
+                while True:
+                    # Check if the provided workspace directory exist:
+                    if os.path.isdir(provided_workspace_dir):
+                        break
+                    else:
+                        print(f"\n{ERROR}Workspace directory not existing:{RESET} {INPUT}{provided_workspace_dir}{RESET}")
+                        provided_workspace_dir = os.path.expanduser(input(f"\n{REQUEST}Provide the new location of the workspace directory:{RESET}").strip())
+                print(f'\n{INFO}Workspace directory changed to:{RESET} {INPUT}{provided_workspace_dir}{RESET}')
+        
+            else:               
+                # If the -w option is not provided, ask the user if they want to change the default workspace
+                print(f"\n{INFO}The workspace directory would be mounted by default as /workspace in the container.{RESET}")
+                print(f"{INFO}It is the directory where your project data should be stored to be accessed inside the container.{RESET}")
+                print(f"{HINT}HINT: It can be set to an existing directory with the option '-w /your_workspace'{RESET}")
+                change_workspace_dir = input(f"\n{REQUEST}Do you want to change the default workspace directory ({default_workspace_dir}), (y/n)?: {RESET}").strip()
+                # Define a variable to control breaking out of both loops
+                break_inner_loop = False
+                while True:
+                    if change_workspace_dir in ["n","no"]:
+                        print(f'\n{INFO}Workspace directory:{RESET} {INPUT}{default_workspace_dir}{RESET}')
+                        break
+                    elif change_workspace_dir in ["y","yes"]:
+                        while True:
+                            # Ask the user to input the new workspace directory
+                            #provided_workspace_dir = input(f"Provide the new location of the workspace directory:").strip().lower()
+                            provided_workspace_dir = os.path.expanduser(input(f"\n{REQUEST}Provide the new location of the workspace directory:{RESET}").strip())  # Expand '~' to full path
+                            #print(f"Expanded workspace directory path: {provided_workspace_dir}")
+                            # provided_workspace_dir = input(f"Provide the new location of the workspace directory:").strip()  # Expand '~' to full path
 
+                            # Check if the provided workspace directory exist:
+                            if os.path.isdir(provided_workspace_dir):
+                                print(f'\n{INFO}Workspace directory changed to:{RESET} {INPUT}{provided_workspace_dir}{RESET}')
+                                break_inner_loop = True
+                                break
+                            else:
+                                print(f"\n{ERROR}Workspace directory not existing:{RESET} {INPUT}{provided_workspace_dir}{RESET}") 
+                        if break_inner_loop:
+                            break                           
+                    else:
+                        print(f"{ERROR}\nInvalid input. Please use y(yes) or n(no).{RESET}")
+                        break     
+            '''
 
 
             '''
@@ -1009,30 +1123,7 @@ def main():
                     else:
                         print(f"{ERROR}\nInvalid input. Please use y(yes) or n(no).{RESET}")  
                         
-            '''    
-            args.workspace_dir = default_workspace_dir                 
-            # Check if the provided workspace directory exist:
-            if os.path.isdir(args.workspace_dir):
-                print(f"\n{INFO}/workspace will mount on:{RESET} {INPUT}{args.workspace_dir}{RESET}")
-            else:
-                print(f"\n{ERROR}Aborted.\n\nWorkspace directory not existing:{RESET} {INPUT}{args.workspace_dir}{RESET}")
-                print(f"\n{INFO}The workspace directory would be mounted as /workspace in the container.{RESET}")
-                print(f"\n{INFO}It is the directory where your project data should be stored to be accessed\ninside the container.{RESET}")
-                print(f"\n{INFO}It can be set to an existing directory with the option '-w /your_workspace'{RESET}")
-                sys.exit(-1)
-            
-            # Check if the provided data directory exist:
-            if args.data_dir:
-                data_mount = os.path.realpath(args.data_dir)
-                if os.path.isdir(data_mount):
-                    print(f"{INFO}/data will mount on:{RESET} {INPUT}{data_mount}{RESET}")
-                else:
-                    print(f"\n{ERROR}Aborted.\n\nData directory not existing: {data_mount}{RESET}")
-                    print(f"\n{INFO}The data directory would be mounted as /data in the container.{RESET}")
-                    print(f"\n{INFO}It is the directory where data sets, for example, mounted from\nnetwork volumes can be accessed inside the container.{RESET}")
-                    sys.exit(-1)
-            
-            print(f"\n{INFO}Selected Framework and Version:{RESET} {INPUT}{selected_framework} {selected_version}{RESET}")
+            '''        
             
             #############################################DOCKER TASKS START######################################################################
             # Generate a unique container tag
