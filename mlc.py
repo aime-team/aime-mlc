@@ -11,16 +11,15 @@ import os
 import subprocess
 import argparse
 import json
-
+from pathlib import Path
 import csv
 import re
 
 
 
 # Set default values for script variables
-supported_arch = "CUDA_ADA"     # Supported architecture for the container
-mlc_version=3                   # Version number of the machine learning container setup
-
+mlc_container_version=3                   # Version number of the machine learning container setup
+mlc_version = "2.0"                       # Version number of the machine learning container
 # Obtain user and group id, user name for different tasks by create, open,...
 user_id = os.getuid()
 #user_name = subprocess.getoutput("id -un")
@@ -34,44 +33,92 @@ group_id = os.getgid()
 # Coloring the frontend (ANSI escape codes)
 
 ERROR = "\033[91m"          # Red
-INFO = "\033[92m"           # Green
+INFO = "\033[37m"           # White
+#INFO = "\033[92m"           # Green
 REQUEST = "\033[96m"        # Cyan
-WARNING = "\033[38;5;208m"  # Orange color
-INPUT = "\033[38;5;214m"    # Light orange color
+WARNING = "\033[38;5;208m"  # Orange
+INPUT = "\033[38;5;214m"    # Light orange
 HINT = "\033[93m"           # Yellow
 
 RESET = "\033[0m"
 
-MAGENTA = "\033[95m"
-BLUE = "\033[94m"
+AIME_LOGO = "\033[38;5;214m"# Light orange           
 
+MAGENTA = "\033[95m"        # Magenta
+BLUE = "\033[94m"           # Blue
+
+aime_logo =f"""{AIME_LOGO}
+         ▗▄▖ ▗▄▄▄▖▗▖  ▗▖▗▄▄▄▖    ▗▖  ▗▖▗▖    ▗▄▄▖
+        ▐▌ ▐▌  █  ▐▛▚▞▜▌▐▌       ▐▛▚▞▜▌▐▌   ▐▌   
+        ▐▛▀▜▌  █  ▐▌  ▐▌▐▛▀▀▘    ▐▌  ▐▌▐▌   ▐▌   
+        ▐▌ ▐▌▗▄█▄▖▐▌  ▐▌▐▙▄▄▖    ▐▌  ▐▌▐▙▄▄▖▝▚▄▄▖                                       
+                     version 2.0 
+                     MIT License
+        Copyright (c) AIME GmbH and affiliates.                               
+        {RESET}"""
 
 
 def get_flags():
+    """_summary_
+
+    Returns:
+        _type_: _description_
     """
+    parser = argparse.ArgumentParser(
+        description=f'{AIME_LOGO}Manage machine learning containers (mlc).{RESET}',
+        #description=f'{AIME_LOGO}AIME machine learning container management system.\n\nEasily install, run and manage Docker containers\n\nfor Pytorch and Tensorflow deep learning frameworks.{RESET}',
+        usage = "mlc [-h] [-v] {create, export, import,...} [-h]"
+        #usage = "mlc [-h] [-v] {create, export, import,...} [-h]"
+
+    )
     
-    Args:
-    
-    Return:
-        args: 
-    """
-    parser = argparse.ArgumentParser(description='Manage machine learning containers.')
+    parser.add_argument(
+        '-v', '--version', 
+        action = 'version',
+        version = f'\nmlc version: {mlc_version}\n'
+        #help = 'Current version of the AIME mlc containers'
+    )
     
     # Create subparsers for different commands
     subparsers = parser.add_subparsers(dest='command', required=False, help='Sub-command to execute')
 
-  
     # Parser for the "create" command
     parser_create = subparsers.add_parser('create', help='Create a new container')
     parser_create.add_argument(
-        'container_name', nargs='?', type=str, help='Name of the container')
-    parser_create.add_argument('framework', nargs='?', type=str, help='The framework to use')
-    parser_create.add_argument('version', nargs='?', type=str, help='The version of the framework')
-    parser_create.add_argument('-w', '--workspace_dir', default=None, type=str, 
-                               help='Location of the workspace directory. Default: /home/$USER/workspace')
-    parser_create.add_argument('-d', '--data_dir', type=str, help='Location of the data directory.')
-    parser_create.add_argument('-ng', '--num_gpus', type=str, default='all',
-                               help='Number of GPUs to be used. Default: all')
+        'container_name', 
+        nargs='?', 
+        type=str, 
+        help='Name of the container'
+    )    
+    parser_create.add_argument(
+        'framework', 
+        nargs='?', 
+        type=str, 
+        help='The framework to use'
+    )
+    parser_create.add_argument(
+        'version', 
+        nargs='?', 
+        type=str, 
+        help='The version of the framework'
+    )
+    parser_create.add_argument(
+        '-w', '--workspace_dir', 
+        default=None, 
+        type=str, 
+        help='Location of the workspace directory. Default: /home/$USER/workspace'
+    )
+    parser_create.add_argument(
+        '-d', '--data_dir', 
+        type=str, 
+        help='Location of the data directory.'
+    )
+    parser_create.add_argument(
+        '-ng', '--num_gpus', 
+        type=str, 
+        default='all',
+        help='Number of GPUs to be used. Default: all'
+    )
 
     # Parser for the "export" command
     parser_export = subparsers.add_parser('export', help='Export container/s')
@@ -81,33 +128,72 @@ def get_flags():
     
     # Parser for the "list" command
     parser_list = subparsers.add_parser('list', help='List of created ml-containers')
-    parser_list.add_argument('-a', '--all', action = "store_true", help='List of the created ml-container/s by all users')
+    parser_list.add_argument(
+        '-a', '--all', 
+        action = "store_true", 
+        help='List of the created ml-container/s by all users'
+    )
 
     # Parser for the "open" command
     parser_open = subparsers.add_parser('open', help='Open an existing container')
-    parser_open.add_argument('container_name', nargs = '?', type=str, help='Name of the container/s to be opened')
+    parser_open.add_argument(
+        'container_name', 
+        nargs = '?', 
+        type=str, 
+        help='Name of the container to be opened'
+    )
     
     # Parser for the "remove" command
     parser_remove = subparsers.add_parser('remove', help='Remove a container')
-    parser_remove.add_argument('container_name', nargs = '?', type=str, help='Name of the container/s to be removed')
-    parser_remove.add_argument('-fr', '--force_remove', action = "store_true", help='Force to remove the container without asking the user.') 
+    parser_remove.add_argument(
+        'container_name', 
+        nargs = '?', 
+        type=str, 
+        help='Name of the container/s to be removed'
+    )
+    parser_remove.add_argument(
+        '-fr', '--force_remove', 
+        action = "store_true", 
+        help='Force to remove the container without asking the user.'
+    ) 
     
     # Parser for the "start" command
     parser_start = subparsers.add_parser('start', help='Start existing container/s')
-    parser_start.add_argument('container_name', nargs = '?', type=str, help='Name of the container/s to be started')
+    parser_start.add_argument(
+        'container_name', 
+        nargs = '?', 
+        type=str, 
+        help='Name of the container/s to be started'
+    )
 
     # Parser for the "stats" command
     parser_stats = subparsers.add_parser('stats', help='Show the most important statistics of the running ml-containers')
-    parser_stats.add_argument('-s', '--stream', action = "store_true", help='Show the streaming (live) statistics of the running ml-containers')
+    parser_stats.add_argument(
+        '-s', '--stream', 
+        action = "store_true", 
+        help='Show the streaming (live) statistics of the running ml-containers'
+    )
 
     # Parser for the "stop" command
     parser_stop = subparsers.add_parser('stop', help='Stop existing container/s')
-    parser_stop.add_argument('container_name', nargs = '?', type=str, help='Name of the container/s to be stopped')
-    parser_stop.add_argument('-fs', '--force_stop', action = "store_true", help='Force to stop the container without asking the user.') 
+    parser_stop.add_argument(
+        'container_name', 
+        nargs = '?', 
+        type=str, help='Name of the container/s to be stopped'
+    )
+    parser_stop.add_argument(
+        '-fs', '--force_stop', 
+        action = "store_true", 
+        help='Force to stop the container without asking the user.'
+    ) 
     
     # Parser for the "update-sys" command
     parser_update_sys = subparsers.add_parser('update-sys', help='Update of the system')
-    parser_update_sys.add_argument('-fu', '--force_update', action = "store_true", help='Force to update directly without asking user.') 
+    parser_update_sys.add_argument(
+        '-fu', '--force_update', 
+        action = "store_true", 
+        help='Force to update directly without asking user.'
+    ) 
             
     # Extract subparser names
     subparser_names = subparsers.choices.keys()
@@ -117,6 +203,11 @@ def get_flags():
     args = parser.parse_args()
     
     while not args.command:
+        print("\n" + f'{AIME_LOGO}_{RESET}'*55)  
+        print(aime_logo)
+        print(f"{AIME_LOGO}AIME machine learning container management system.\nEasily install, run and manage Docker containers\nfor Pytorch and Tensorflow deep learning frameworks.{RESET}")
+        print("\n" + f'{AIME_LOGO}_{RESET}'*55)  
+
         print(f"\n{INFO}Available commands:{RESET} \n" + ', '.join(available_commands) + "\n")
         chosen_command = input(f"{REQUEST}Please choose a command:{RESET} ").strip()
         if chosen_command in available_commands:
@@ -125,148 +216,13 @@ def get_flags():
             args = parser.parse_args()
         else:
             print(f"\n{ERROR}Invalid command:{RESET} {chosen_command}")
-    
-    # Convert the Namespace object to a dictionary
-    args_dict = vars(args)
-        
-    return args, args_dict
+       
+    return args
 
 
-#############################################################################################################
 
-def extract_from_ml_images(filename, filter_cuda_architecture=None):
-    """
-    
-    Args:
-    
-    Return:
-    
-    """
-    frameworks_dict = {}
-    headers = ['framework', 'version', 'cuda architecture', 'docker image']
-    
-    with open(filename, mode='r') as file:
-        reader = csv.DictReader(file, fieldnames=headers)
-        for row in reader:
-            stripped_row = {key: value.strip() for key, value in row.items() }
-            framework = stripped_row['framework']
-            version = stripped_row['version']
-            cuda_architecture = stripped_row['cuda architecture']
-            docker_image = stripped_row['docker image']
-            
-            if cuda_architecture == filter_cuda_architecture or filter_cuda_architecture is None:
-                if framework not in frameworks_dict:
-                    frameworks_dict[framework] = []
-                    frameworks_dict[framework].append((version, docker_image))
-                else:
-                    frameworks_dict[framework].append((version, docker_image))
-    # ToDo: add the possibility to select another CUDA architecture                
-    if not frameworks_dict:
-        print(f"No frameworks found with CUDA architecture '{filter_cuda_architecture}'.")
-        sys.exit(1)
-    
-    framework_list = list(frameworks_dict.keys())
-
-    return frameworks_dict, framework_list #, version_list
-
-def get_container_name(container_name, user_name, command):
-    """
-    
-    Args:0
-    
-    Return:
-    
-    """
-    available_user_containers, _ = existing_user_containers(user_name, command)  
-    
-    if container_name is not None:
-        return validate_container_name(container_name)
-    else:
-        while True:                           
-            container_name = input(f"\n{REQUEST}Enter a container name: {RESET}")
-            if container_name in available_user_containers:
-                print(f'\n{INPUT}[{container_name}]{RESET} {ERROR}already exists. Provide a new container name.{RESET}')
-                show_container_info(False)
-                continue
-            try:
-                return validate_container_name(container_name)
-            except ValueError as e:
-                print(e)
-
-def validate_container_name(container_name):
-    """
-    
-    Args:
-    
-    Return:
-    
-    """
-    
-    pattern = re.compile(r'^[a-zA-Z0-9_\-#]*$')
-    if not pattern.match(container_name):
-        invalid_chars = [char for char in container_name if not re.match(r'[a-zA-Z0-9_\-#]', char)]
-        invalid_chars_str = ''.join(invalid_chars)
-        raise ValueError(f"The container name {INPUT}{container_name}{RESET} contains {ERROR}invalid{RESET} characters: {ERROR}{invalid_chars_str}{RESET}")
-    return container_name
-
-
-def display_frameworks(frameworks_dict):
-    """
-    
-    Args:
-    
-    Return:
-    
-    """    
-    print(f"\n{REQUEST}Select a framework:{RESET}")
-    framework_list = list(frameworks_dict.keys())
-    for i, framework in enumerate(framework_list, start=1):
-        print(f"{i}) {framework}")
-    return framework_list
-
-def get_user_selection(prompt, max_value):
-    """
-    
-    Args:
-    
-    Return:
-    
-    """
-        
-    while True:
-        try:
-            selection = int(input(prompt))
-            if 1 <= selection <= max_value:
-                return selection
-            else:
-                print(f"{ERROR}Please enter a number between 1 and {max_value}.{RESET}")
-        except ValueError:
-            print(f"{ERROR}Invalid input. Please enter a valid number.{RESET}")
-# ToDo: actually not needed this function (only 1 line). Try to embed the list comprenhension within the code (OK)
-'''
-def get_versions(versions):
-    """
-    
-    Args:
-    
-    Return:
-    
-    """      
-    available_versions = [version[0] for version in versions]
-    
-    return available_versions
-'''
-def display_versions(framework, versions):
-    """
-    
-    Args:
-    
-    Return:
-    
-    """    
-    print(f"\n{INFO}Available versions for {framework}:{RESET}")
-    for i, (version, _) in enumerate(versions, start=1):
-        print(f"{i}) {version}")
+################################################################################################################################################
+################################################################################################################################################
 
 # ToDo: subtitute this function for the other one (see below), which uses command
 def check_container_exists(name):
@@ -370,28 +326,6 @@ def check_container_exists(container_name):
     output, _, _ = run_docker_command(docker_command)
     return output
 #####-------------------------------
-def existing_user_containers(user_name, mlc_command):
-    """
-    Provide a list of existing containers created previously by the current user
-    Args:
-    
-    Return:      
-    
-    """
-    # List all containers with the 'aime.mlc' label owned by the current user
-    docker_command = f"docker container ps -a --filter=label=aime.mlc.USER={user_name} --format '{{{{.Names}}}}'"
-    output, _,_ = run_docker_command(docker_command)
-    container_tags = output.splitlines()
-    # check that at least 1 container has been created previously
-    if not container_tags and mlc_command != 'create':
-        print(f"\n{ERROR}Create at least one container. If not, mlc {mlc_command} does not work.{RESET}\n")
-        exit(1)
-
-    # Extract base names from full container names
-    container_names = [re.match(r"^(.*?)\._\.\w+$", container).group(1) for container in container_tags]
-
-    return container_names, container_tags
-
 def print_existing_container_list(container_list):
     """
     Print an ordered list with the existing containers
@@ -522,94 +456,13 @@ def get_container_image(container_tag):
     output, _, _ = run_docker_command(docker_command_get_image)
     return output
 
-###############################################LIST#########################################
+#LIST##########################################################################################
 
+
+
+
+#STATS#############################################################################################################
 # Define a function to format the container info
-def format_container_info(container_info_dict):
-    """
-    
-    Args:
-    
-    Return:
-    
-    """ 
-    
-    # Extract the 'Labels' field
-    labels_string = container_info_dict.get('Labels', {})
-    # Split the labels string into key-value pairs
-    labels_dict = dict(pair.split('=', 1) for pair in labels_string.split(','))
-    # Retrieve the value for 'aime.mlc.USER'
-    container_name = labels_dict["aime.mlc.NAME"]
-    size = container_info_dict['Size']
-    user_name = labels_dict.get("aime.mlc.USER", "N/A")
-    framework = labels_dict["aime.mlc.FRAMEWORK"]
-    status = container_info_dict['Status']
-    
-    info_to_be_printed = [f"[{container_name}]", size, user_name, framework, status]
-    return info_to_be_printed 
-
-def show_container_info(args_all):
-    """
-    
-    Args:
-    
-    Return:
-    
-    """ 
-    # Adapt the filter to the selected flags (no flag or --all)
-    filter_aime_mlc_user =  "label=aime.mlc" if args_all else f"label=aime.mlc={user_name}"
-    docker_command_ls = [
-        "docker", "container", 
-        "ls", 
-        "-a", 
-        "--filter", filter_aime_mlc_user, 
-        "--format", '{{json .}}'    
-    ]
-
-    # Initialize Popen to run the docker command with JSON output
-    process = subprocess.Popen(
-        docker_command_ls, 
-        shell=False,
-        text=True,
-        stdout=subprocess.PIPE,  # Capture stdout
-        stderr=subprocess.PIPE    # Capture stderr
-    )
-    
-    # Communicate with the process to get output and errors
-    stdout_data, stderr_data = process.communicate()        
-    stdout_data = str(stdout_data.strip())
-
-    # Check for any errors
-    if process.returncode != 0:
-        print(f"Error: {stderr_data}")
-    else:
-        # Split into individual lines and process them as JSON objects
-        output_lines = []
-        try:
-            # Split by newlines and parse each line as JSON
-            json_lines = stdout_data.split('\n') #list
-            containers_info = [json.loads(line) for line in json_lines if line]
-
-            # Apply formatting to all containers' info
-            output_lines = list(map(format_container_info, containers_info))
-        
-        except json.JSONDecodeError:
-            print("Failed to decode JSON output.")
-        except KeyError as e:
-            print(f"Missing expected key: {e}")
-    # Define an output format string with specified widths
-    format_string = "{:<15}{:<30}{:<15}{:<30}{:<30}"
-    print(f"\n{INFO}Current status of the ml-containers:{RESET}\n")
-    titles = ["CONTAINER", "SIZE", "USER", "FRAMEWORK", "STATUS"]
-    print(format_string.format(*titles))
-    print("\n".join(format_string.format(*info) for info in output_lines)+"\n")
-
-############################################################STATS##################################################
-# Define a function to format the container info
-
-
-
-
 
 def format_container_stats(container_stats_dict):
     """_summary_
@@ -707,10 +560,267 @@ def show_container_stats(stream):
             print("\nTerminating streaming of container stats.")
         process.terminate()
         process.wait()
+####################################################CREATE#########################################################
 
-###############################################################################################################
+def extract_from_ml_images(filename, filter_cuda_architecture=None):
+    """Extract the information from the file corresponding to the supported frameworks, versions, cuda architectures and docker images.
+
+    Args:
+        filename (str): name of the file where the framework, version, cuda archicture and docker image name are provided 
+        filter_cuda_architecture (str, optional): the cuda architecture, for example, "CUDA_ADA". Defaults to None.
+
+    Returns:
+        dict, list: provides a dictionary and a list of the available frameworks.
+    """
+    frameworks_dict = {}
+    headers = ['framework', 'version', 'cuda architecture', 'docker image']
     
+    with open(filename, mode='r') as file:
+        reader = csv.DictReader(file, fieldnames=headers)
+        for row in reader:
+            stripped_row = {key: value.strip() for key, value in row.items() }
+            framework = stripped_row['framework']
+            version = stripped_row['version']
+            cuda_architecture = stripped_row['cuda architecture']
+            docker_image = stripped_row['docker image']
+            
+            if cuda_architecture == filter_cuda_architecture or filter_cuda_architecture is None:
+                if framework not in frameworks_dict:
+                    frameworks_dict[framework] = []
+                    frameworks_dict[framework].append((version, docker_image))
+                else:
+                    frameworks_dict[framework].append((version, docker_image))
+    # ToDo: add the possibility to select another CUDA architecture                
+    if not frameworks_dict:
+        print(f"No frameworks found with CUDA architecture '{filter_cuda_architecture}'.")
+        sys.exit(1)
+    
+    return frameworks_dict
 
+
+def get_container_name(container_name, user_name, command):
+    """_summary_
+
+    Args:
+        container_name (_type_): _description_
+        user_name (_type_): _description_
+        command (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
+
+    available_user_containers, _ = existing_user_containers(user_name, command)  
+    
+    if container_name is not None:
+        return validate_container_name(container_name)
+    else:
+        while True:                           
+            container_name = input(f"\n{REQUEST}Enter a container name: {RESET}")
+            if container_name in available_user_containers:
+                print(f'\n{INPUT}[{container_name}]{RESET} {ERROR}already exists. Provide a new container name.{RESET}')
+                show_container_info(False)
+                continue
+            try:
+                return validate_container_name(container_name)
+            except ValueError as e:
+                print(e)
+
+def existing_user_containers(user_name, mlc_command):
+    """Provide a list of existing containers created previously by the current user
+
+
+    Args:
+        user_name (_type_): _description_
+        mlc_command (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """    
+ 
+    # List all containers with the 'aime.mlc' label owned by the current user
+    docker_command = f"docker container ps -a --filter=label=aime.mlc.USER={user_name} --format '{{{{.Names}}}}'"
+    output, _,_ = run_docker_command(docker_command)
+    container_tags = output.splitlines()
+    # check that at least 1 container has been created previously
+    if not container_tags and mlc_command != 'create':
+        print(f"\n{ERROR}Create at least one container. If not, mlc {mlc_command} does not work.{RESET}\n")
+        exit(1)
+
+    # Extract base names from full container names
+    container_names = [re.match(r"^(.*?)\._\.\w+$", container).group(1) for container in container_tags]
+
+    return container_names, container_tags
+
+
+def validate_container_name(container_name):
+    """_summary_
+
+    Args:
+        container_name (_type_): _description_
+
+    Raises:
+        ValueError: _description_
+
+    Returns:
+        _type_: _description_
+    """
+    
+    pattern = re.compile(r'^[a-zA-Z0-9_\-#]*$')
+    if not pattern.match(container_name):
+        invalid_chars = [char for char in container_name if not re.match(r'[a-zA-Z0-9_\-#]', char)]
+        invalid_chars_str = ''.join(invalid_chars)
+        raise ValueError(f"The container name {INPUT}{container_name}{RESET} contains {ERROR}invalid{RESET} characters: {ERROR}{invalid_chars_str}{RESET}")
+    return container_name
+
+def show_container_info(args_all):
+    """_summary_
+
+    Args:
+        args_all (_type_): _description_
+    """
+    # Adapt the filter to the selected flags (no flag or --all)
+    filter_aime_mlc_user =  "label=aime.mlc" if args_all else f"label=aime.mlc={user_name}"
+    docker_command_ls = [
+        "docker", "container", 
+        "ls", 
+        "-a", 
+        "--filter", filter_aime_mlc_user, 
+        "--format", '{{json .}}'    
+    ]
+
+    # Initialize Popen to run the docker command with JSON output
+    process = subprocess.Popen(
+        docker_command_ls, 
+        shell=False,
+        text=True,
+        stdout=subprocess.PIPE,  # Capture stdout
+        stderr=subprocess.PIPE    # Capture stderr
+    )
+    
+    # Communicate with the process to get output and errors
+    stdout_data, stderr_data = process.communicate()        
+    stdout_data = str(stdout_data.strip())
+
+    # Check for any errors
+    if process.returncode != 0:
+        print(f"Error: {stderr_data}")
+    else:
+        # Split into individual lines and process them as JSON objects
+        output_lines = []
+        try:
+            # Split by newlines and parse each line as JSON
+            json_lines = stdout_data.split('\n') #list
+            containers_info = [json.loads(line) for line in json_lines if line]
+
+            # Apply formatting to all containers' info
+            output_lines = list(map(format_container_info, containers_info))
+        
+        except json.JSONDecodeError:
+            print("Failed to decode JSON output.")
+        except KeyError as e:
+            print(f"Missing expected key: {e}")
+    # Define an output format string with specified widths
+    format_string = "{:<15}{:<30}{:<15}{:<30}{:<30}"
+    print(f"\n{INFO}Current status of the ml-containers:{RESET}\n")
+    titles = ["CONTAINER", "SIZE", "USER", "FRAMEWORK", "STATUS"]
+    print(format_string.format(*titles))
+    print("\n".join(format_string.format(*info) for info in output_lines)+"\n")
+
+# Define a function to format the container info
+def format_container_info(container_info_dict):
+    """_summary_
+
+    Args:
+        container_info_dict (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
+    
+    # Extract the 'Labels' field
+    labels_string = container_info_dict.get('Labels', {})
+    # Split the labels string into key-value pairs
+    labels_dict = dict(pair.split('=', 1) for pair in labels_string.split(','))
+    # Retrieve the value for 'aime.mlc.USER'
+    container_name = labels_dict["aime.mlc.NAME"]
+    size = container_info_dict['Size']
+    user_name = labels_dict.get("aime.mlc.USER", "N/A")
+    framework = labels_dict["aime.mlc.FRAMEWORK"]
+    status = container_info_dict['Status']
+    
+    info_to_be_printed = [f"[{container_name}]", size, user_name, framework, status]
+    return info_to_be_printed 
+
+def get_user_selection(prompt, max_value):
+    """
+    
+    Args:
+    
+    Return:
+    
+    """
+        
+    while True:
+        try:
+            selection = int(input(prompt))
+            if 1 <= selection <= max_value:
+                return selection
+            else:
+                print(f"{ERROR}Please enter a number between 1 and {max_value}.{RESET}")
+        except ValueError:
+            print(f"{ERROR}Invalid input. Please enter a valid number.{RESET}")
+
+def display_frameworks(frameworks_dict):
+    """_summary_
+
+    Args:
+        frameworks_dict (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """  
+    print(f"\n{REQUEST}Select a framework:{RESET}")
+    framework_list = list(frameworks_dict.keys())
+    for i, framework in enumerate(framework_list, start=1):
+        print(f"{i}) {framework}")
+    return framework_list
+
+def display_versions(framework, versions):
+    """_summary_
+
+    Args:
+        framework (_type_): _description_
+        versions (_type_): _description_
+    """    
+    print(f"\n{INFO}Available versions for {framework}:{RESET}")
+    for i, (version, _) in enumerate(versions, start=1):
+        print(f"{i}) {version}")
+
+
+def display_frameworks_versions(framework_list,  display = "framework"):
+    """_summary_
+
+    Args:
+        framework_list (_type_): _description_
+        display (str, optional): _description_. Defaults to "framework".
+    """    
+    if display == "framework":
+        print(f"\n{REQUEST}Select a framework:{RESET}")
+        for i, framework in enumerate(framework_list, start=1):
+            print(f"{i}) {framework}")
+    elif display == "version":
+        print(f"\n{INFO}Available versions for {framework}:{RESET}")
+        for i, (version, _) in enumerate(versions, start=1):
+            print(f"{i}) {version}")
+    else:
+        exit(1)
+        
+
+
+###############################################################################################################################################################################################
+###############################################################################################################################################################################################
+###############################################################################################################################################################################################
 def main():
     try: 
         # Needed tasks/info for all features
@@ -718,35 +828,35 @@ def main():
         filter_cuda_architecture = 'CUDA_ADA'    
         
         # Arguments parsing
-        args, args_dict = get_flags()
-        # ToDo: check what is better: args or args_dict
+        args = get_flags()
             
-        #####################################################
         # Read and save content of ml_images.repo
-        repo_file = os.path.join(os.path.dirname(__file__), repo_name)
-        
+        # OLD: repo_file = os.path.join(os.path.dirname(__file__), repo_name)
+        repo_file = Path(__file__).parent / repo_name
+
         # Extract framework, version and docker image from the ml_images.repo file
-        framework_version_docker, frameworks = extract_from_ml_images(repo_file, filter_cuda_architecture)
-                       
+        framework_version_docker = extract_from_ml_images(repo_file, filter_cuda_architecture)
+                
         if args.command == 'create':
 
             if args.container_name is None and args.framework is None and args.version is None:
                                 
                 print(
-                    "\n" + '#'*100 + "\n" \
+                    "\n" + '_'*100 + "\n" \
                     f"\t{INFO}Info{RESET}: \
                     \n\tCreate a new machine learning container. \
                     \n\t{INFO}Correct Usage{RESET}: \
                     \n\tmlc create <container_name> <framework_name> <framework_version> -w /home/$USER/workspace -d /data -ng 1 \
                     \n\t{INFO}Example{RESET}: \
-                    \n\tmlc create pt231aime Pytorch 2.3.1-aime -w /home/user_name/workspace -d /data -ng 1\n" + '#'*100
+                    \n\tmlc create pt231aime Pytorch 2.3.1-aime -w /home/user_name/workspace -d /data -ng 1\n" + '_'*100
                 )                
 
             # User provides the container name and is validated
             validated_container_name = get_container_name(args.container_name, user_name, args.command)
-            
+                        
             # List existing containers of the current user
             available_user_containers, available_user_container_tags = existing_user_containers(user_name, args.command)
+            
             # Generate a unique container tag
             provided_container_tag = f"{validated_container_name}._.{user_id}"
             
@@ -755,25 +865,27 @@ def main():
                 show_container_info(False)
                 sys.exit(-1)
 
-            # Framework part:
+            # Framework selection:
             if args.framework is None:            
                 while args.framework is None:
+                    #framework_list = framework_version_docker.keys()
+                    
                     framework_list = display_frameworks(framework_version_docker)
                     framework_num = get_user_selection(f"{REQUEST}Enter the number of the desired framework: {RESET}", len(framework_list))
                     args.framework = framework_list[framework_num - 1]
             else:    
-                available_frameworks = list(framework_version_docker.keys())
+                #available_frameworks = framework_version_docker.keys()
                 while True:
-                    if args.framework in available_frameworks:
-                        break
-                    else:
+                    if not framework_version_docker.get(args.framework):
                         framework_list = display_frameworks(framework_version_docker)
                         framework_number = get_user_selection(f"{REQUEST}Enter the number of the desired framework: {RESET}", len(framework_list))
                         args.framework = framework_list[framework_number - 1]
+                    else:
+                        break
                 
             selected_framework = args.framework
                 
-            # Version part
+            # Version selection:
             versions_images = framework_version_docker[selected_framework]
             if args.version is None:
                 while args.version is None:  
@@ -799,7 +911,7 @@ def main():
             
             selected_version = args.version
             
-            
+            # Workspace directory selection:
             # Default workspace directory
             default_workspace_dir = os.path.expanduser('~/workspace')
             
@@ -934,9 +1046,26 @@ def main():
             # Run the Docker Container: Starts a new container, installs necessary packages, 
             # and sets up the environment.
             # ToDo(OK): subtitute in docker_run_cmd the os.getlogin() by user_name (see below)
+            bash_command_run_cmd = (
+                f"echo \"export PS1='[{validated_container_name}] `whoami`@`hostname`:\${{PWD#*}}$ '\" >> ~/.bashrc; "
+                "apt-get update -y > /dev/null; "
+                "apt-get install sudo git -q -y > /dev/null; "
+                f"addgroup --gid {group_id} {user_name} > /dev/null; "
+                f"adduser --uid {user_id} --gid {group_id} {user_name} --disabled-password --gecos aime > /dev/null; "
+                f"passwd -d {user_name}; "
+                f"echo \"{user_name} ALL=(ALL) NOPASSWD: ALL\" > /etc/sudoers.d/{user_name}_no_password; "
+                f"chmod 440 /etc/sudoers.d/${user_name}_no_password; "
+                "exit"
+            )
+                        
             docker_run_cmd = [                
-                'docker', 'run', '-v', f'{args.workspace_dir}:{workspace}', '-w', workspace,
-                '--name', container_tag, '--tty', '--privileged', '--gpus', args.num_gpus,
+                'docker', 'run', 
+                '-v', f'{args.workspace_dir}:{workspace}', 
+                '-w', workspace,
+                '--name', container_tag, 
+                '--tty', 
+                '--privileged', 
+                '--gpus', args.num_gpus,
                 '--network', 'host', 
                 '--device', '/dev/video0', 
                 '--device', '/dev/snd',
@@ -946,12 +1075,7 @@ def main():
                 '-v', '/tmp/.X11-unix:/tmp/.X11-unix', 
                 selected_docker_image, 
                 'bash', '-c',
-                f'echo "export PS1=\'[{validated_container_name}] `whoami`@`hostname`:${{PWD#*}}$ \'" >> ~/.bashrc; '
-                f'apt-get update -y > /dev/null; apt-get install sudo git -q -y > /dev/null; '
-                f'addgroup --gid {group_id} {user_name} > /dev/null; '
-                f'adduser --uid {user_id} --gid {group_id} {user_name} --disabled-password --gecos aime > /dev/null; '
-                f'passwd -d {user_name}; echo "{user_name} ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/{user_name}_no_password; '
-                f'chmod 440 /etc/sudoers.d/{user_name}_no_password; exit'
+                bash_command_run_cmd
             ]
       
             # ToDo: not use subprocess.run but subprocess.Popen 
@@ -977,6 +1101,10 @@ def main():
             if args.data_dir:
                 volumes +=  ['-v', f'{args.data_dir}:{data}']
             
+            bash_command_create_cmd = (
+                f"echo \"export PS1='[{validated_container_name}] `whoami`@`hostname`:\${{PWD#*}}$ '\" >> ~/.bashrc; bash"
+            )
+
             docker_create_cmd = [
                 'docker', 'create', 
                 '-it', 
@@ -985,7 +1113,7 @@ def main():
                 '--label', f'{container_label}={user_name}', 
                 '--label', f'{container_label}.NAME={validated_container_name}',
                 '--label', f'{container_label}.USER={user_name}', 
-                '--label', f'{container_label}.VERSION={mlc_version}',
+                '--label', f'{container_label}.VERSION={mlc_container_version}',
                 '--label', f'{container_label}.WORK_MOUNT={args.workspace_dir}', 
                 '--label', f'{container_label}.DATA_MOUNT={args.data_dir}',
                 '--label', f'{container_label}.FRAMEWORK={selected_framework}-{selected_version}', 
@@ -1004,7 +1132,7 @@ def main():
                 '-v', '/tmp/.X11-unix:/tmp/.X11-unix', 
                 '--group-add', 'video', 
                 '--group-add', 'sudo', f'{selected_docker_image}:{container_tag}', 'bash', '-c',
-                f'echo "export PS1=\'[{validated_container_name}] `whoami`@`hostname`:${{PWD#*}}$ \'" >> ~/.bashrc; bash'
+                bash_command_create_cmd
             ]
 
             # Insert the volumes list at the correct position, after '-it'
@@ -1047,13 +1175,13 @@ def main():
                     print(f'\n{INFO}Provided container name {RESET}{INPUT}[{args.container_name}]{RESET}{INFO} exists and will be opened.{RESET}')                   
             else:
                 print(
-                    "\n" + '#'*100 + "\n" \
+                    "\n" + '_'*100 + "\n" \
                     f"\t{INFO}Info{RESET}: \
                     \n\tOpen an existing machine learning container.  \
                     \n\t{INFO}Correct Usage{RESET}: \
                     \n\tmlc open <container_name>  \
                     \n\t{INFO}Example{RESET}: \
-                    \n\tmlc open pt231aime\n" + '#'*100
+                    \n\tmlc open pt231aime\n" + '_'*100
                 )
 
                 # ToDo: create a function ( the same 4 lines as above)
@@ -1189,13 +1317,13 @@ def main():
                     show_container_info(False)
                     exit(1)
                 print(
-                    "\n" + '#'*100 + "\n" \
+                    "\n" + '_'*100 + "\n" \
                     f"\t{INFO}Info{RESET}: \
                     \n\tRemove an existing and not running machine learning container.  \
                     \n\t{INFO}Correct Usage{RESET}: \
                     \n\tmlc remove <container_name>  [-fr | --force_remove]\
                     \n\t{INFO}Example{RESET}: \
-                    \n\tmlc remove pt231aime [-fr | --force_remove]\n" + '#'*100
+                    \n\tmlc remove pt231aime [-fr | --force_remove]\n" + '_'*100
                 )    
 
                 # ToDo: create a function ( the same 4 lines as below)
@@ -1294,13 +1422,13 @@ def main():
                         break                      
             else:    
                 print(
-                    "\n" + '#'*100 + "\n" \
+                    "\n" + '_'*100 + "\n" \
                     f"\t{INFO}Info{RESET}: \
                     \n\tStart an existing machine learning container.  \
                     \n\t{INFO}Correct Usage{RESET}: \
                     \n\tmlc start <container_name>  \
                     \n\t{INFO}Example{RESET}: \
-                    \n\tmlc start pt231aime\n" + '#'*100
+                    \n\tmlc start pt231aime\n" + '_'*100
                 )   
 
                 # ToDo: create a function ( the same 4 lines as below)
@@ -1427,13 +1555,13 @@ def main():
                     show_container_info(False)
                     exit(1)
                 print(
-                    "\n" + '#'*100 + "\n" \
+                    "\n" + '_'*100 + "\n" \
                     f"\t{INFO}Info{RESET}: \
                     \n\tStop an existing machine learning container.  \
                     \n\t{INFO}Correct Usage{RESET}: \
                     \n\tmlc stop <container_name> [-fs | --force_stop]\
                     \n\t{INFO}Example{RESET}: \
-                    \n\tmlc stop pt231aime [-fs | --force_stop]\n" + '#'*100
+                    \n\tmlc stop pt231aime [-fs | --force_stop]\n" + '_'*100
                 )    
                 # ToDo: create a function ( the same 4 lines as below)
                 print(f"\n{INFO}Running containers of the current user:{RESET}")
