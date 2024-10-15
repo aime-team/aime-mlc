@@ -18,8 +18,8 @@ import re
 
 
 # Set default values for script variables
-mlc_container_version=3                   # Version number of the machine learning container setup
-mlc_version = "2.0"                       # Version number of the machine learning container
+mlc_container_version=3                         # Version number of AIME MLC setup
+mlc_version = "2.0-beta1"                       # Version number of AIME MLC
 # Obtain user and group id, user name for different tasks by create, open,...
 user_id = os.getuid()
 #user_name = subprocess.getoutput("id -un")
@@ -47,12 +47,21 @@ AIME_LOGO = "\033[38;5;214m"# Light orange
 MAGENTA = "\033[95m"        # Magenta
 BLUE = "\033[94m"           # Blue
 
-aime_logo =f"""{AIME_LOGO}
+aime_logo = f"""{AIME_LOGO}
+     ▗▄▄▖   ▄  ▗▖  ▗▖ ▄▄▄▖    ▗▖  ▗▖▗▖    ▗▄▄▄
+    ▐▌  ▐▌  █  ▐▛▚▞▜▌         ▐▛▚▞▜▌▐▌   ▐▌   
+    ▐▛  ▜▌  █  ▐▌  ▐▌ ▀▀▀     ▐▌  ▐▌▐▌   ▐▌   
+    ▐▌  ▐▌  █  ▐▌  ▐▌ ▄▄▄▖    ▐▌  ▐▌▐▙▄▄▖▝▚▄▄▄                                      
+                 version {mlc_version} 
+                 MIT License
+    Copyright (c) AIME GmbH and affiliates.                               
+        {RESET}"""
+aime_logo1 = f"""{AIME_LOGO}
          ▗▄▖ ▗▄▄▄▖▗▖  ▗▖▗▄▄▄▖    ▗▖  ▗▖▗▖    ▗▄▄▖
         ▐▌ ▐▌  █  ▐▛▚▞▜▌▐▌       ▐▛▚▞▜▌▐▌   ▐▌   
         ▐▛▀▜▌  █  ▐▌  ▐▌▐▛▀▀▘    ▐▌  ▐▌▐▌   ▐▌   
         ▐▌ ▐▌▗▄█▄▖▐▌  ▐▌▐▙▄▄▖    ▐▌  ▐▌▐▙▄▄▖▝▚▄▄▖                                       
-                     version 2.0 
+                     version {mlc_version} 
                      MIT License
         Copyright (c) AIME GmbH and affiliates.                               
         {RESET}"""
@@ -65,18 +74,17 @@ def get_flags():
         _type_: _description_
     """
     parser = argparse.ArgumentParser(
-        description=f'{AIME_LOGO}Manage machine learning containers (mlc).{RESET}',
-        #description=f'{AIME_LOGO}AIME machine learning container management system.\n\nEasily install, run and manage Docker containers\n\nfor Pytorch and Tensorflow deep learning frameworks.{RESET}',
-        usage = "mlc [-h] [-v] {create, export, import,...} [-h]"
-        #usage = "mlc [-h] [-v] {create, export, import,...} [-h]"
-
+        #description=f'{AIME_LOGO}Manage machine learning containers (mlc).{RESET}',
+        description=f'{aime_logo} \n{AIME_LOGO}AIME Machine Learning Container management system.\nEasily install, run and manage Docker containers\nfor Pytorch and Tensorflow deep learning frameworks.{RESET}',
+        usage = "mlc [-h] [-v] <command> [-h]",
+        formatter_class = argparse.RawTextHelpFormatter  
     )
     
     parser.add_argument(
         '-v', '--version', 
         action = 'version',
-        version = f'\nmlc version: {mlc_version}\n'
-        #help = 'Current version of the AIME mlc containers'
+        version = f'{INPUT}AIME MLC version: {mlc_version}{RESET}'
+        #help = 'Current version of the AIME MLC'
     )
     
     # Create subparsers for different commands
@@ -127,11 +135,11 @@ def get_flags():
     parser_import = subparsers.add_parser('import',  help='Import container/s')
     
     # Parser for the "list" command
-    parser_list = subparsers.add_parser('list', help='List of created ml-containers')
+    parser_list = subparsers.add_parser('list', help='List of created containers')
     parser_list.add_argument(
         '-a', '--all', 
         action = "store_true", 
-        help='List of the created ml-container/s by all users'
+        help='List of the created container/s by all users'
     )
 
     # Parser for the "open" command
@@ -167,11 +175,11 @@ def get_flags():
     )
 
     # Parser for the "stats" command
-    parser_stats = subparsers.add_parser('stats', help='Show the most important statistics of the running ml-containers')
+    parser_stats = subparsers.add_parser('stats', help='Show the most important statistics of the running containers')
     parser_stats.add_argument(
         '-s', '--stream', 
         action = "store_true", 
-        help='Show the streaming (live) statistics of the running ml-containers'
+        help='Show the streaming (live) statistics of the running containers'
     )
 
     # Parser for the "stop" command
@@ -201,23 +209,8 @@ def get_flags():
 
     # Parse arguments
     args = parser.parse_args()
-    
-    while not args.command:
-        print("\n" + f'{AIME_LOGO}_{RESET}'*55)  
-        print(aime_logo)
-        print(f"{AIME_LOGO}AIME machine learning container management system.\nEasily install, run and manage Docker containers\nfor Pytorch and Tensorflow deep learning frameworks.{RESET}")
-        print("\n" + f'{AIME_LOGO}_{RESET}'*55)  
-
-        print(f"\n{INFO}Available commands:{RESET} \n" + ', '.join(available_commands) + "\n")
-        chosen_command = input(f"{REQUEST}Please choose a command:{RESET} ").strip()
-        if chosen_command in available_commands:
-            # Re-parse arguments with the chosen command
-            sys.argv.insert(1, chosen_command)
-            args = parser.parse_args()
-        else:
-            print(f"\n{ERROR}Invalid command:{RESET} {chosen_command}")
-       
-    return args
+         
+    return args, available_commands
 
 
 
@@ -347,7 +340,7 @@ def select_container(container_list):
     """
     while True:
         try:
-            selection = int(input(f"\n{REQUEST}Select the number of the container:{RESET}"))
+            selection = int(input(f"\n{REQUEST}Select the number of the container: {RESET}"))
             container_list_length = len(container_list)
             if 1 <= selection <= container_list_length:
                 return container_list[selection - 1], selection
@@ -456,7 +449,7 @@ def get_container_image(container_tag):
     output, _, _ = run_docker_command(docker_command_get_image)
     return output
 
-#LIST##########################################################################################
+#LIST##############################################################################################################
 
 
 
@@ -498,7 +491,7 @@ def show_container_stats(stream):
     """Fetch and optionally stream Docker container stats."""
     # Determine the correct Docker command based on the stream flag
     if stream:
-        print("\nStreaming ml-containers stats (press Ctrl+C to stop):\n")
+        print("\nStreaming containers stats (press Ctrl+C to stop):\n")
         command = [
             "docker",
             "stats",
@@ -524,8 +517,8 @@ def show_container_stats(stream):
     try:
         # Print the final processed output
         # Define an output format string with specified widths
-        format_string = "{:<15}{:<15}{:<30}{:<15}{:<15}"
-        print(f"\n{INFO}Running ml-containers:{RESET}\n")
+        format_string = "{:<30}{:<10}{:<25}{:<10}{:<15}"
+        print(f"\n{INFO}Running containers:{RESET}\n")
         titles = ["CONTAINER", "CPU %", "MEM USAGE / LIMIT", "MEM %", "PROCESSES (PIDs)"]
         while True:           
             
@@ -616,7 +609,7 @@ def get_container_name(container_name, user_name, command):
         return validate_container_name(container_name)
     else:
         while True:                           
-            container_name = input(f"\n{REQUEST}Enter a container name: {RESET}")
+            container_name = input(f"\n{REQUEST}Enter a container name (valid characters: a-z, A-Z, 0-9, _,-,#): {RESET}")
             if container_name in available_user_containers:
                 print(f'\n{INPUT}[{container_name}]{RESET} {ERROR}already exists. Provide a new container name.{RESET}')
                 show_container_info(False)
@@ -721,8 +714,8 @@ def show_container_info(args_all):
         except KeyError as e:
             print(f"Missing expected key: {e}")
     # Define an output format string with specified widths
-    format_string = "{:<15}{:<30}{:<15}{:<30}{:<30}"
-    print(f"\n{INFO}Current status of the ml-containers:{RESET}\n")
+    format_string = "{:<30}{:<30}{:<10}{:<20}{:<30}"
+    print(f"\n{INFO}Current status of the containers:{RESET}\n")
     titles = ["CONTAINER", "SIZE", "USER", "FRAMEWORK", "STATUS"]
     print(format_string.format(*titles))
     print("\n".join(format_string.format(*info) for info in output_lines)+"\n")
@@ -782,6 +775,7 @@ def display_frameworks(frameworks_dict):
     """  
     print(f"\n{REQUEST}Select a framework:{RESET}")
     framework_list = list(frameworks_dict.keys())
+
     for i, framework in enumerate(framework_list, start=1):
         print(f"{i}) {framework}")
     return framework_list
@@ -816,8 +810,6 @@ def display_frameworks_versions(framework_list,  display = "framework"):
     else:
         exit(1)
         
-
-
 ###############################################################################################################################################################################################
 ###############################################################################################################################################################################################
 ###############################################################################################################################################################################################
@@ -828,15 +820,20 @@ def main():
         filter_cuda_architecture = 'CUDA_ADA'    
         
         # Arguments parsing
-        args = get_flags()
-            
+        args, available_commands = get_flags()
+       
+        if not args.command:
+            print(f"\nUse {INPUT}mlc -h{RESET} or {INPUT}mlc --help{RESET} to get more informations about the AIME MLC tool.\n")
+        elif args.command not in available_commands:
+            print("Hallo")
         # Read and save content of ml_images.repo
         # OLD: repo_file = os.path.join(os.path.dirname(__file__), repo_name)
         repo_file = Path(__file__).parent / repo_name
 
         # Extract framework, version and docker image from the ml_images.repo file
         framework_version_docker = extract_from_ml_images(repo_file, filter_cuda_architecture)
-                
+        framework_version_docker_sorted = dict(sorted(framework_version_docker.items()))
+        
         if args.command == 'create':
 
             if args.container_name is None and args.framework is None and args.version is None:
@@ -844,7 +841,7 @@ def main():
                 print(
                     "\n" + '_'*100 + "\n" \
                     f"\t{INFO}Info{RESET}: \
-                    \n\tCreate a new machine learning container. \
+                    \n\tCreate a new container. \
                     \n\t{INFO}Correct Usage{RESET}: \
                     \n\tmlc create <container_name> <framework_name> <framework_version> -w /home/$USER/workspace -d /data -ng 1 \
                     \n\t{INFO}Example{RESET}: \
@@ -868,16 +865,16 @@ def main():
             # Framework selection:
             if args.framework is None:            
                 while args.framework is None:
-                    #framework_list = framework_version_docker.keys()
+                    #framework_list = framework_version_docker_sorted.keys()
                     
-                    framework_list = display_frameworks(framework_version_docker)
+                    framework_list = display_frameworks(framework_version_docker_sorted)
                     framework_num = get_user_selection(f"{REQUEST}Enter the number of the desired framework: {RESET}", len(framework_list))
                     args.framework = framework_list[framework_num - 1]
             else:    
-                #available_frameworks = framework_version_docker.keys()
+                #available_frameworks = framework_version_docker_sorted.keys()
                 while True:
-                    if not framework_version_docker.get(args.framework):
-                        framework_list = display_frameworks(framework_version_docker)
+                    if not framework_version_docker_sorted.get(args.framework):
+                        framework_list = display_frameworks(framework_version_docker_sorted)
                         framework_number = get_user_selection(f"{REQUEST}Enter the number of the desired framework: {RESET}", len(framework_list))
                         args.framework = framework_list[framework_number - 1]
                     else:
@@ -886,18 +883,16 @@ def main():
             selected_framework = args.framework
                 
             # Version selection:
-            versions_images = framework_version_docker[selected_framework]
+            versions_images = framework_version_docker_sorted[selected_framework]
             if args.version is None:
                 while args.version is None:  
                     display_versions(selected_framework, versions_images)
                     version_number = get_user_selection(f"{REQUEST}Enter the number of your version: {RESET}", len(versions_images))
                     # Version and docker image selected
                     args.version, selected_docker_image = versions_images[version_number - 1]
-                workspace_be_asked = True
-                data_dir_be_asked = True
+                workspace_be_asked= data_dir_be_asked = models_be_asked = True
             else:
-                workspace_be_asked = False
-                data_dir_be_asked = False
+                workspace_be_asked= data_dir_be_asked = models_be_asked = False
                 available_versions = [version[0] for version in versions_images]
                 while True:
                     if args.version in available_versions:
@@ -916,20 +911,26 @@ def main():
             default_workspace_dir = os.path.expanduser('~/workspace')
             
             if workspace_be_asked:
-                print(f"\n{INFO}The workspace directory would be mounted by default as /workspace in the container.{RESET}")
-                print(f"{INFO}It is the directory where your project data should be stored to be accessed inside the container.{RESET}")
-                print(f"{HINT}HINT: It can be set to an existing directory with the option '-w /your_workspace'{RESET}")
-                change_workspace_dir = input(f"\n{REQUEST}Do you want to change the default workspace directory ({default_workspace_dir}), (y/n)?: {RESET}").strip()
+                workspace_message = (
+                    f"\n{INFO}The workspace directory would be mounted by default as /workspace in the container.{RESET}"
+                    f"\n{INFO}It is the directory where your project data should be stored to be accessed inside the container.{RESET}"
+                    f"\n{HINT}HINT: It can be set to an existing directory with the option '-w /your_workspace'{RESET}"
+                )
+                #print(f"\n{INFO}The workspace directory would be mounted by default as /workspace in the container.{RESET}")
+                #print(f"{INFO}It is the directory where your project data should be stored to be accessed inside the container.{RESET}")
+                #print(f"{HINT}HINT: It can be set to an existing directory with the option '-w /your_workspace'{RESET}")
+                print(f"{workspace_message}")
+                keep_workspace_dir = input(f"\n{REQUEST}Current workspace location:{default_workspace_dir}. Keep it (Y/n)?: {RESET}").strip()
                 # Define a variable to control breaking out of both loops
                 break_inner_loop = False
                 while True:
-                    if change_workspace_dir in ["n","no"]:
+                    if keep_workspace_dir in ["y","yes",""]:
                         #print(f'\n{INFO}Workspace directory:{RESET} {INPUT}{default_workspace_dir}{RESET}')
                         workspace_dir = default_workspace_dir
                         break
-                    elif change_workspace_dir in ["y","yes"]:
+                    elif keep_workspace_dir in ["n","no"]:
                         while True:
-                            provided_workspace_dir = os.path.expanduser(input(f"\n{REQUEST}Provide the new location of the workspace directory:{RESET}").strip())  # Expand '~' to full path
+                            provided_workspace_dir = os.path.expanduser(input(f"\n{REQUEST}Provide the new location of the workspace directory: {RESET}").strip())  # Expand '~' to full path
                             # Check if the provided workspace directory exist:
                             if os.path.isdir(provided_workspace_dir):
                                 print(f'\n{INFO}Workspace directory changed to:{RESET} {INPUT}{provided_workspace_dir}{RESET}')
@@ -942,7 +943,7 @@ def main():
                             break                           
                     else:
                         print(f"{ERROR}\nInvalid input. Please use y(yes) or n(no).{RESET}")
-                        break
+                        #break
             else:
                 # If the -w option is not provided
                 workspace_dir = default_workspace_dir            
@@ -956,36 +957,45 @@ def main():
                         break
                     else:
                         print(f"\n{ERROR}Workspace directory not existing:{RESET} {INPUT}{provided_workspace_dir}{RESET}")
-                        provided_workspace_dir = os.path.expanduser(input(f"\n{REQUEST}Provide the new location of the workspace directory:{RESET}").strip())
+                        provided_workspace_dir = os.path.expanduser(input(f"\n{REQUEST}Provide the new location of the workspace directory: {RESET}").strip())
                 workspace_dir = provided_workspace_dir
                 print(f'\n{INFO}Workspace directory changed to:{RESET} {INPUT}{provided_workspace_dir}{RESET}')
  
-            args.workspace_dir = workspace_dir                     
+            args.workspace_dir = workspace_dir          
+            # ToDO: check the below condition. It looks like the condition will be nevel fullfilled.           
             # Check if the provided workspace directory exist:
             if os.path.isdir(args.workspace_dir):
-                print(f"\n{INFO}/workspace will mount on:{RESET} {INPUT}{args.workspace_dir}{RESET}")
+                print(f"\n{INFO}/workspace will be mounted on:{RESET} {INPUT}{args.workspace_dir}{RESET}")
             else:
-                print(f"\n{ERROR}Aborted.\n\nWorkspace directory not existing:{RESET} {INPUT}{args.workspace_dir}{RESET}")
-                print(f"\n{INFO}The workspace directory would be mounted as /workspace in the container.{RESET}")
-                print(f"\n{INFO}It is the directory where your project data should be stored to be accessed\ninside the container.{RESET}")
-                print(f"\n{INFO}It can be set to an existing directory with the option '-w /your_workspace'{RESET}")
+                workspace_aborted_message = f"\n{ERROR}Aborted.\n\nWorkspace directory not existing:{RESET} {INPUT}{args.workspace_dir}{RESET}" + workspace_message
+                print(f"{workspace_aborted_message}")
+                #print(f"\n{ERROR}Aborted.\n\nWorkspace directory not existing:{RESET} {INPUT}{args.workspace_dir}{RESET}")
+                #print(f"\n{INFO}The workspace directory would be mounted as /workspace in the container.{RESET}")
+                #print(f"\n{INFO}It is the directory where your project data should be stored to be accessed\ninside the container.{RESET}")
+                #print(f"\n{INFO}It can be set to an existing directory with the option '-w /your_workspace'{RESET}")
                 sys.exit(-1)
             
             # Data directory:            
             if data_dir_be_asked:
-                print(f"\n{INFO}The data directory would be mounted as /data in the container.{RESET}")
-                print(f"\n{INFO}It is the directory where data sets, for example, mounted from\nnetwork volumes can be accessed inside the container.{RESET}")
-                print(f"{HINT}HINT: It can be set to an existing directory with the option '-d /your_data_directory'{RESET}")
-                provide_data_dir = input(f"\n{REQUEST}Do you want to provide a data directory (y/n)?: {RESET}").strip()
+                data_message = (
+                    f"\n{INFO}The data directory would be mounted as /data in the container.{RESET}"
+                    f"\n{INFO}It is the directory where data sets, for example, mounted from\nnetwork volumes can be accessed inside the container.{RESET}"
+                    f"\n{HINT}HINT: It can be set to an existing directory with the option '-d /your_data_directory'{RESET}"
+                )
+                #print(f"\n{INFO}The data directory would be mounted as /data in the container.{RESET}")
+                #print(f"\n{INFO}It is the directory where data sets, for example, mounted from\nnetwork volumes can be accessed inside the container.{RESET}")
+                #print(f"{HINT}HINT: It can be set to an existing directory with the option '-d /your_data_directory'{RESET}")
+                print(f"{data_message}")
+                provide_data_dir = input(f"\n{REQUEST}Do you want to provide a data directory (y/N)?: {RESET}").strip()
                 # Define a variable to control breaking out of both loops
                 break_inner_loop = False
                 while True:
-                    if provide_data_dir in ["n","no"]:
+                    if provide_data_dir in ["n","no", ""]:
                         print(f'\n{INFO}Data directory:{RESET} {INPUT}-{RESET}')
                         break
                     elif provide_data_dir in ["y","yes"]:
                         while True:
-                            provided_data_dir = os.path.expanduser(input(f"\n{REQUEST}Provide the new location of the data directory:{RESET}").strip())  # Expand '~' to full path
+                            provided_data_dir = os.path.expanduser(input(f"\n{REQUEST}Provide the new location of the data directory: {RESET}").strip())  # Expand '~' to full path
                             # Check if the provided data directory exists:
                             if os.path.isdir(provided_data_dir):
                                 print(f'\n{INFO}Data directory will be:{RESET} {INPUT}{provided_data_dir}{RESET}')
@@ -1028,7 +1038,7 @@ def main():
                 show_container_info(False)
                 sys.exit(-1)
             else:
-                print(f"\n{INFO}The mlc container will be created:{RESET} {INPUT}{validated_container_name}{RESET} ")
+                print(f"\n{INFO}The container will be created:{RESET} {INPUT}{validated_container_name}{RESET} ")
 
 
             # Pulling the required image from aime-hub: 
@@ -1046,7 +1056,7 @@ def main():
             # Run the Docker Container: Starts a new container, installs necessary packages, 
             # and sets up the environment.
             # ToDo(OK): subtitute in docker_run_cmd the os.getlogin() by user_name (see below)
-            bash_command_run_cmd = (
+            bash_command_prepare_cmd = (
                 f"echo \"export PS1='[{validated_container_name}] `whoami`@`hostname`:\${{PWD#*}}$ '\" >> ~/.bashrc; "
                 "apt-get update -y > /dev/null; "
                 "apt-get install sudo git -q -y > /dev/null; "
@@ -1058,7 +1068,7 @@ def main():
                 "exit"
             )
                         
-            docker_run_cmd = [                
+            docker_prepare_container = [                
                 'docker', 'run', 
                 '-v', f'{args.workspace_dir}:{workspace}', 
                 '-w', workspace,
@@ -1075,17 +1085,19 @@ def main():
                 '-v', '/tmp/.X11-unix:/tmp/.X11-unix', 
                 selected_docker_image, 
                 'bash', '-c',
-                bash_command_run_cmd
+                bash_command_prepare_cmd
             ]
       
             # ToDo: not use subprocess.run but subprocess.Popen 
-            result_run_cmd = subprocess.run(docker_run_cmd, capture_output=True, text=True )
+            result_run_cmd = subprocess.run(docker_prepare_container, capture_output=True, text=True )
 
             # Commit the Container: Saves the current state of the container as a new image.
             # ToDo: not use subprocess.run but subprocess.Popen
             #result_commit = subprocess.run(['docker', 'commit', container_tag, f'{selected_docker_image}'], capture_output=True, text=True)#, stdout = subprocess.DEVNULL, stderr =subprocess.DEVNULL)
-            
-            result_commit = subprocess.run(['docker', 'commit', container_tag, f'{selected_docker_image}:{container_tag}'], capture_output=True, text=True)#, stdout = subprocess.DEVNULL, stderr =subprocess.DEVNULL)
+            bash_command_commit = [
+                'docker', 'commit', container_tag, f'{selected_docker_image}:{container_tag}'
+            ]
+            result_commit = subprocess.run(bash_command_commit, capture_output=True, text=True)#, stdout = subprocess.DEVNULL, stderr =subprocess.DEVNULL)
             
             # ToDo: capture possible errors and treat them  
 
@@ -1163,7 +1175,7 @@ def main():
             
             if args.container_name:     
                 if args.container_name not in available_user_containers:
-                    print(f"\n{ERROR}No containers found matching the name{RESET} {INPUT}[{args.container_name}]{RESET} {ERROR}for the current user.{RESET}")
+                    print(f"\n{ERROR}No containers found matching the name{RESET} {INPUT}[{args.container_name}]{RESET} {ERROR}of the current user.{RESET}")
                     # ToDo: create a function ( the same 4 lines as below)
                     print(f"\n{INFO}Available containers of the current user:{RESET}")
                     print_existing_container_list(available_user_containers)
@@ -1280,13 +1292,13 @@ def main():
                     print(f'\n{INPUT}[{args.container_name}]{RESET} {INFO}is not running and will be removed.{RESET}')
                     if not args.force_remove:
                         
-                        print(f"\n{HINT}Hint: use the flag -fr or --force_remove to avoid be asked.{RESET}")
+                        print(f"\n{HINT}Hint: Use the flag -fr or --force_remove to avoid be asked.{RESET}")
 
                         while True:
                             
-                            print(f"\n{WARNING}Caution: After your selection, there is no option to recover the container. Be sure about your decision.{RESET}")
+                            print(f"\n{WARNING}Caution: After your selection, there is no option to recover the container.{RESET}")
 
-                            user_input = input(f"\n{REQUEST}Are you sure that you want to remove the container{RESET} {INPUT}[{args.container_name}]{RESET} {REQUEST}(y/n)?:{RESET}").strip().lower()
+                            user_input = input(f"\n{REQUEST}Are you sure that you want to remove the container{RESET} {INPUT}[{args.container_name}]{RESET} {REQUEST}(y/n)?: {RESET}").strip().lower()
 
                             if user_input in ["y", "yes"]:                          
                                 break
@@ -1303,7 +1315,7 @@ def main():
                         exit(1) 
                     while True:
                         # ToDo: create a function ( the same 4 lines as below)
-                        print(f"\n{INFO}Only the following no-running containers of the current user can be removed:{RESET} ")
+                        print(f"\n{INFO}Only the following no running containers of the current user can be removed:{RESET} ")
                         print_existing_container_list(no_running_containers)
                         selected_container_name, selected_container_position = select_container(no_running_containers)
                         print(f"\n{INFO}Selected container to be removed:{RESET} {selected_container_name}")    
@@ -1311,7 +1323,7 @@ def main():
                     
                                       
             else:    
-                # check that at least 1 container is not-running
+                # check that at least 1 container is no running
                 if no_running_container_number == 0:
                     print(f"\n{ERROR}All containers are running.\nIf you want to remove a container, stop it before with: mlc stop container_name.{RESET}")
                     show_container_info(False)
@@ -1319,7 +1331,7 @@ def main():
                 print(
                     "\n" + '_'*100 + "\n" \
                     f"\t{INFO}Info{RESET}: \
-                    \n\tRemove an existing and not running machine learning container.  \
+                    \n\tRemove an existing and no running machine learning container.  \
                     \n\t{INFO}Correct Usage{RESET}: \
                     \n\tmlc remove <container_name>  [-fr | --force_remove]\
                     \n\t{INFO}Example{RESET}: \
@@ -1327,11 +1339,11 @@ def main():
                 )    
 
                 # ToDo: create a function ( the same 4 lines as below)
-                print(f"\n{INFO}The following not running containers of the current user can be removed:{RESET}")
+                print(f"\n{INFO}The following no running containers of the current user can be removed:{RESET}")
                 print_existing_container_list(no_running_containers)
-                print(f"\n{WARNING}Caution: After your selection, there is no option to recover the container. Be sure about your decision.{RESET}")
+                print(f"\n{WARNING}Caution: After your selection, there is no option to recover the container.{RESET}")
                 selected_container_name, selected_container_position = select_container(no_running_containers)
-                print(f"\n{INFO}Selected container to be removed:{RESET} {selected_container_name}")  
+                print(f"\n{INFO}Selected container to be removed:{RESET} {INPUT}{selected_container_name}{RESET}")  
             
             # Obtain container_tag from the selected container name
             selected_container_tag = no_running_container_tags[selected_container_position-1]
@@ -1399,7 +1411,7 @@ def main():
                         exit(1)
                     print(f"\n{ERROR}The provided container{RESET} {INPUT}[{args.container_name}]{RESET} {ERROR}exists and is running. Not possible to be started.{RESET}")
                     # ToDo: create a function ( the same 4 lines as below)
-                    print(f"\n{INFO}Only the following no-running containers of the current user can be started:{RESET} ")
+                    print(f"\n{INFO}Only the following no running containers of the current user can be started:{RESET} ")
                     print_existing_container_list(no_running_containers)
                     selected_container_name, selected_container_position = select_container(no_running_containers)
                     print(f"{INFO}Selected container to be started:{RESET} {selected_container_name}")                            
@@ -1415,7 +1427,7 @@ def main():
                         exit(1)
                     while True:
                         # ToDo: create a function ( the same 4 lines as below)
-                        print(f"\n{INFO}Only the following no-running containers of the current user can be started:{RESET} ")
+                        print(f"\n{INFO}Only the following no running containers of the current user can be started:{RESET} ")
                         print_existing_container_list(no_running_containers)
                         selected_container_name, selected_container_position = select_container(no_running_containers)
                         print(f"\n{INFO}Selected container to be started:{RESET} {selected_container_name}")    
@@ -1432,7 +1444,7 @@ def main():
                 )   
 
                 # ToDo: create a function ( the same 4 lines as below)
-                print(f"\n{INFO}The following not running containers of the current user can be started:{RESET}")
+                print(f"\n{INFO}The following no running containers of the current user can be started:{RESET}")
                 print_existing_container_list(no_running_containers)
                 selected_container_name, selected_container_position = select_container(no_running_containers)
                 print(f"\n{INFO}Selected container to be started:{RESET} {selected_container_name}")  
@@ -1500,7 +1512,7 @@ def main():
                 if args.container_name in no_running_containers:
                     if running_container_number == 0:
                         print(
-                            f"{ERROR}\nAll containers are stopped. You cannot stop no-running containers.{RESET}"
+                            f"{ERROR}\nAll containers are stopped. You cannot stop no running containers.{RESET}"
                        )
                         show_container_info(False) 
                         exit(1)
@@ -1516,18 +1528,19 @@ def main():
                     print(f'\n{INPUT}[{args.container_name}]{RESET} {INFO}is running and will be stopped.{RESET}')
                     if not args.force_stop:
                         
-                        print(f"\n{HINT}Hint: use the flag -fs or --force_stop to avoid be asked.{RESET}")
+                        print(f"\n{HINT}Hint: Use the flag -fs or --force_stop to avoid be asked.{RESET}")
 
                         while True:
                             
-                            print(f"\n{WARNING}Caution: all running processes of the selected container will be terminated and you will NOT ask again. Be sure about your decision.{RESET}")
+                            print(f"\n{WARNING}Caution: All running processes of the selected container will be terminated.{RESET}")
 
-                            user_input = input(f"\n{INFO}Are you sure that you want to stop the container{RESET} {INPUT}[{args.container_name}]{RESET} {INFO}(y/n)?:{RESET}").strip().lower()
+                            user_input = input(f"\n{INFO}Are you sure that you want to stop the container{RESET} {INPUT}[{args.container_name}]{RESET} {INFO}(y/N)?: {RESET}").strip().lower()
 
                             if user_input in ["y", "yes"]:                          
                                 print(f"\n{INFO}All running processes of the selected container will be terminated.{RESET}")
                                 break
-                            elif user_input in ["n", "no"]:
+                            elif user_input in ["n", "no", ""]:
+                                print(f"\n{INPUT}[{args.container_name}]{RESET} {INFO}will not be stopped.{RESET}")
                                 exit(1)
                             else:
                                 print(f"{ERROR}\nInvalid input. Please use y(yes) or n(no).{RESET}") 
@@ -1541,7 +1554,7 @@ def main():
                             # ToDo: create a function ( the same 4 lines as below)
                             print(f"\n{INFO}Only the following running containers of the current user can be stopped:{RESET} ")
                             print_existing_container_list(running_containers)
-                            print(f"\n{WARNING}Caution: all running processes of the selected container will be terminated and you will NOT ask again. Be sure about your decision.{RESET}")
+                            print(f"\n{WARNING}Caution: All running processes of the selected container will be terminated.{RESET}")
                             selected_container_name, selected_container_position = select_container(running_containers)
                             print(f"\n{INFO}Selected container to be stopped:{RESET} {selected_container_name}")    
                             break 
@@ -1566,7 +1579,7 @@ def main():
                 # ToDo: create a function ( the same 4 lines as below)
                 print(f"\n{INFO}Running containers of the current user:{RESET}")
                 print_existing_container_list(running_containers)
-                print(f"\n{WARNING}Caution: all running processes of the selected container will be terminated.{RESET}")
+                print(f"\n{WARNING}Caution: All running processes of the selected container will be terminated.{RESET}")
                 selected_container_name, selected_container_position = select_container(running_containers)
                 print(f"\n{INFO}Selected container to be stopped:{RESET} {INPUT}{selected_container_name}{RESET}")  
             
@@ -1592,7 +1605,7 @@ def main():
             
             # Check if the .git directory exists
             if not os.path.isdir(f"{mlc_path}/.git"):
-                print(f"{ERROR}Failed: ML container system not installed as updatable git repo.\nAdd the mlc's location to ~/.bashrc or change to the location of the mlc. {RESET}")
+                print(f"{ERROR}Failed: ML container system not installed as updatable git repo.\nAdd the AIME MLC's location to ~/.bashrc or change to the location of the AIME MLC. {RESET}")
                 sys.exit(-1)  # Exit if the directory is not a git repo
                         
             # Determine if sudo is required for git operations
@@ -1609,13 +1622,13 @@ def main():
             
             if not args.force_update:
                         
-                print(f"\n{HINT}Hint: use the flag -fu or --force_update to avoid be asked.{RESET}")
+                print(f"\n{HINT}Hint: Use the flag -fu or --force_update to avoid be asked.{RESET}")
                 
                 print(f"\n{INFO}This will update the ML container system to the latest version.{RESET}")
 
                 # If sudo is required, ask if the user wants to check for updates
                 if sudo == "":
-                    reply = input(f"\n{REQUEST}Check for available updates (y/n)?:{RESET}").strip().lower()
+                    reply = input(f"\n{REQUEST}Check for available updates (y/n)?: {RESET}").strip().lower()
                     if reply not in ["y", "yes"]:
                         sys.exit(0)  # Exit if user does not want to check for updates
 
@@ -1635,7 +1648,7 @@ def main():
                 
                 # Print the update log and prompt the user to confirm update
                 print(f"\n{INFO}Update(s) available.\n\nChange Log:\n{update_log}{RESET}")
-                reply = input(f"\n{INFO}Update ML container system? (y/n){RESET}").strip().lower()
+                reply = input(f"\n{INFO}Update ML container system (y/n)?: {RESET}").strip().lower()
                 if reply in ["y", "yes"]:
                     args.update_directly = True  # Set confirmed to True if user agrees to update
                 else:
