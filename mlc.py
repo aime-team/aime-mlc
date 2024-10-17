@@ -810,6 +810,31 @@ def display_frameworks_versions(framework_list,  display = "framework"):
     else:
         exit(1)
         
+def are_you_sure(selected_container_name):
+    """_summary_
+
+    Args:
+        selected_container_name (_type_): _description_
+    """    """_summary_
+    """    
+    print(f"\n{WARNING}Caution: All running processes of the selected container will be terminated.{RESET}")
+
+    while True:
+        are_you_sure = input(f"\n{INPUT}[{selected_container_name}]{RESET} {REQUEST}will be stopped. Are you sure(y/N)?: {RESET}").strip().lower()
+        if are_you_sure in ["y", "yes"]:                          
+            #print(f"\n{INFO}All running processes of the selected container will be terminated.{RESET}")
+            #container_will_stop = True
+            break
+        elif are_you_sure in ["n", "no", ""]:
+            print(f"\n{INPUT}[{selected_container_name}]{RESET} {INFO}will not be stopped.\n{RESET}")
+            exit(1)
+        else:
+            print(f"{ERROR}\nInvalid input. Please use y(yes) or n(no).{RESET}") 
+    
+    #return container_will_stop
+    
+    
+        
 ###############################################################################################################################################################################################
 ###############################################################################################################################################################################################
 ###############################################################################################################################################################################################
@@ -1018,7 +1043,7 @@ def main():
             if args.data_dir:
                 data_dir = os.path.realpath(args.data_dir)
                 if os.path.isdir(data_dir):
-                    print(f"\n{INFO}/data will mount on:{RESET} {INPUT}{data_dir}{RESET}")
+                    print(f"\n{INFO}/data will be mounted on:{RESET} {INPUT}{data_dir}{RESET}")
                 else:
                     print(f"\n{ERROR}Aborted.\n\nData directory not existing: {data_dir}{RESET}")
                     print(f"\n{INFO}The data directory would be mounted as /data in the container.{RESET}")
@@ -1414,12 +1439,13 @@ def main():
                     print(f"\n{INFO}Only the following no running containers of the current user can be started:{RESET} ")
                     print_existing_container_list(no_running_containers)
                     selected_container_name, selected_container_position = select_container(no_running_containers)
-                    print(f"{INFO}Selected container to be started:{RESET} {selected_container_name}")                            
+                    print(f"{INFO}Selected container to be started:{RESET} {INPUT}{selected_container_name}{RESET}")                            
                 elif args.container_name in no_running_containers:
 
                     selected_container_name = args.container_name
                     selected_container_position = no_running_containers.index(args.container_name) + 1
                     print(f'\n{INPUT}[{args.container_name}]{RESET} {INFO}is not running and will be started.{RESET}')
+                    
                 else:
                     print(f"\n{INPUT}[{args.container_name}]{RESET} {ERROR}does not exist.")
                     if no_running_container_number == 0:
@@ -1430,7 +1456,7 @@ def main():
                         print(f"\n{INFO}Only the following no running containers of the current user can be started:{RESET} ")
                         print_existing_container_list(no_running_containers)
                         selected_container_name, selected_container_position = select_container(no_running_containers)
-                        print(f"\n{INFO}Selected container to be started:{RESET} {selected_container_name}")    
+                        print(f"\n{INFO}Selected container to be started:{RESET} {INPUT}{selected_container_name}{RESET}")    
                         break                      
             else:    
                 print(
@@ -1507,21 +1533,26 @@ def main():
                       
             no_running_container_number = len(no_running_containers)
             running_container_number = len(running_containers)
-             
-            if args.container_name: 
+            
+            ask_are_you_sure = True
+            
+            if args.container_name:
+                if running_container_number == 0:
+                    print(
+                        f"{ERROR}\nAll containers are stopped. You cannot stop no running containers.{RESET}"
+                    )
+                    show_container_info(False) 
+                    exit(0)
+
                 if args.container_name in no_running_containers:
-                    if running_container_number == 0:
-                        print(
-                            f"{ERROR}\nAll containers are stopped. You cannot stop no running containers.{RESET}"
-                       )
-                        show_container_info(False) 
-                        exit(1)
+ 
                     print(f"\n{ERROR}The provided container{RESET} {INPUT}[{args.container_name}]{RESET} {ERROR}exists but is not running. Not possible to be stopped.{RESET}")
                     # ToDo: create a function ( the same 4 lines as below)
                     print(f"\n{INFO}Only the following running containers of the current user can be stopped:{RESET} ")
                     print_existing_container_list(running_containers)
                     selected_container_name, selected_container_position = select_container(running_containers)
-                    print(f"{INFO}Selected container to be stopped:{RESET} {selected_container_name}")                            
+                    print(f"{INFO}Selected container to be stopped:{RESET} {INPUT}{selected_container_name}{RESET}")  
+                    #ask_are_you_sure = True
                 elif args.container_name in running_containers:
                     selected_container_name = args.container_name
                     selected_container_position = running_containers.index(args.container_name) + 1
@@ -1530,11 +1561,14 @@ def main():
                         
                         print(f"\n{HINT}Hint: Use the flag -fs or --force_stop to avoid be asked.{RESET}")
 
+                        #container_stopped = are_you_sure(args.container_name)
+                        #ask_are_you_sure = True
+                        """
                         while True:
                             
                             print(f"\n{WARNING}Caution: All running processes of the selected container will be terminated.{RESET}")
 
-                            user_input = input(f"\n{INFO}Are you sure that you want to stop the container{RESET} {INPUT}[{args.container_name}]{RESET} {INFO}(y/N)?: {RESET}").strip().lower()
+                            user_input = input(f"\n{REQUEST}Are you sure that you want to stop the container{RESET} {INPUT}[{args.container_name}]{RESET} {REQUEST}(y/N)?: {RESET}").strip().lower()
 
                             if user_input in ["y", "yes"]:                          
                                 print(f"\n{INFO}All running processes of the selected container will be terminated.{RESET}")
@@ -1544,29 +1578,29 @@ def main():
                                 exit(1)
                             else:
                                 print(f"{ERROR}\nInvalid input. Please use y(yes) or n(no).{RESET}") 
+                        """
+                    else:
+                        ask_are_you_sure = False
                 else:
                     
-                    print(f"\n{INPUT}[{args.container_name}]{RESET} {ERROR}does not exist.\n")
-                    
-                    # all containers are running
-                    if no_running_container_number == 0:
-                        while True:
-                            # ToDo: create a function ( the same 4 lines as below)
-                            print(f"\n{INFO}Only the following running containers of the current user can be stopped:{RESET} ")
-                            print_existing_container_list(running_containers)
-                            print(f"\n{WARNING}Caution: All running processes of the selected container will be terminated.{RESET}")
-                            selected_container_name, selected_container_position = select_container(running_containers)
-                            print(f"\n{INFO}Selected container to be stopped:{RESET} {selected_container_name}")    
-                            break 
-                    else:
-                        exit(1)
+                    print(f"\n{INPUT}[{args.container_name}]{RESET} {ERROR}does not exist.")
+                                     
+                    while True:
+                        # ToDo: create a function ( the same 4 lines as below)
+                        print(f"\n{INFO}Only the following running containers of the current user can be stopped:{RESET} ")
+                        print_existing_container_list(running_containers)
+                        #print(f"\n{WARNING}Caution: All running processes of the selected container will be terminated.{RESET}")
+                        selected_container_name, selected_container_position = select_container(running_containers)
+                        print(f"\n{INFO}Selected container to be stopped:{RESET} {INPUT}{selected_container_name}{RESET}")    
+                        break 
+                        
                     
             else:    
                 # check that at least 1 container is running
                 if not running_container_tags:
                     print(f"\n{ERROR}All containers are stopped. Therefore there are no one to be stopped.{RESET}")
                     show_container_info(False)
-                    exit(1)
+                    exit(0)
                 print(
                     "\n" + '_'*100 + "\n" \
                     f"\t{INFO}Info{RESET}: \
@@ -1576,16 +1610,36 @@ def main():
                     \n\t{INFO}Example{RESET}: \
                     \n\tmlc stop pt231aime [-fs | --force_stop]\n" + '_'*100
                 )    
+
                 # ToDo: create a function ( the same 4 lines as below)
                 print(f"\n{INFO}Running containers of the current user:{RESET}")
                 print_existing_container_list(running_containers)
-                print(f"\n{WARNING}Caution: All running processes of the selected container will be terminated.{RESET}")
+                #print(f"\n{WARNING}Caution: All running processes of the selected container will be terminated.{RESET}")
                 selected_container_name, selected_container_position = select_container(running_containers)
-                print(f"\n{INFO}Selected container to be stopped:{RESET} {INPUT}{selected_container_name}{RESET}")  
+                #print(f"\n{INFO}Selected container to be stopped:{RESET} {INPUT}{selected_container_name}{RESET}")
+                #container_stopped = are_you_sure(selected_container_name)
+                #ask_are_you_sure = True
             
             # Obtain container_tag from the selected container name
             selected_container_tag = running_container_tags[selected_container_position-1]   
-            
+            #if not container_stopped:
+            #    exit(0)
+            if ask_are_you_sure: 
+                are_you_sure(selected_container_name)
+
+            """
+            while True:
+                print(f"\n{WARNING}Caution: All running processes of the selected container will be terminated.{RESET}")
+                are_you_sure = input(f"\n{INPUT}[{selected_container_name}]{RESET} {REQUEST}will be stopped. Are you sure(y/N)?: {RESET}").strip().lower()
+                if are_you_sure in ["y", "yes"]:                          
+                    print(f"\n{INFO}All running processes of the selected container will be terminated.{RESET}")
+                    break
+                elif are_you_sure in ["n", "no", ""]:
+                    print(f"\n{INPUT}[{selected_container_name}]{RESET} {INFO}will not be stopped.\n{RESET}")
+                    exit(1)
+                else:
+                    print(f"{ERROR}\nInvalid input. Please use y(yes) or n(no).{RESET}") 
+            """
             print(f"\n{INPUT}[{selected_container_name}]{RESET} {INFO}stopping container ...{RESET}")
             # Attempt to stop the container and store the result.
             docker_command_stop = f"docker container stop {selected_container_tag}"
@@ -1628,8 +1682,8 @@ def main():
 
                 # If sudo is required, ask if the user wants to check for updates
                 if sudo == "":
-                    reply = input(f"\n{REQUEST}Check for available updates (y/n)?: {RESET}").strip().lower()
-                    if reply not in ["y", "yes"]:
+                    reply = input(f"\n{REQUEST}Check for available updates (Y/n)?: {RESET}").strip().lower()
+                    if reply not in ["y", "yes", "Y", ""]:
                         sys.exit(0)  # Exit if user does not want to check for updates
 
                 # Fetch the latest updates from remote repo
@@ -1648,8 +1702,8 @@ def main():
                 
                 # Print the update log and prompt the user to confirm update
                 print(f"\n{INFO}Update(s) available.\n\nChange Log:\n{update_log}{RESET}")
-                reply = input(f"\n{INFO}Update ML container system (y/n)?: {RESET}").strip().lower()
-                if reply in ["y", "yes"]:
+                reply = input(f"\n{INFO}Update ML container system (Y/n)?: {RESET}").strip().lower()
+                if reply in ["y", "yes", "Y", ""]:
                     args.update_directly = True  # Set confirmed to True if user agrees to update
                 else:
                     sys.exit(0)  # Exit if user does not want to update
