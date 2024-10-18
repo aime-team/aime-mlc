@@ -34,7 +34,7 @@ group_id = os.getgid()
 
 ERROR = "\033[91m"          # Red
 INFO = "\033[37m"           # White
-#INFO = "\033[92m"           # Green
+INFO_HEADER = "\033[92m"    # Green
 REQUEST = "\033[96m"        # Cyan
 WARNING = "\033[38;5;208m"  # Orange
 INPUT = "\033[38;5;214m"    # Light orange
@@ -47,25 +47,16 @@ AIME_LOGO = "\033[38;5;214m"# Light orange
 MAGENTA = "\033[95m"        # Magenta
 BLUE = "\033[94m"           # Blue
 
-aime_logo = f"""{AIME_LOGO}
+aime_copyright_claim = f"""{AIME_LOGO}
      ▗▄▄▖   ▄  ▗▖  ▗▖ ▄▄▄▖    ▗▖  ▗▖▗▖    ▗▄▄▄
     ▐▌  ▐▌  █  ▐▛▚▞▜▌         ▐▛▚▞▜▌▐▌   ▐▌   
     ▐▛  ▜▌  █  ▐▌  ▐▌ ▀▀▀     ▐▌  ▐▌▐▌   ▐▌   
-    ▐▌  ▐▌  █  ▐▌  ▐▌ ▄▄▄▖    ▐▌  ▐▌▐▙▄▄▖▝▚▄▄▄                                      
-                 version {mlc_version} 
+    ▐▌  ▐▌  █  ▐▌  ▐▌ ▄▄▄▖    ▐▌  ▐▌▐▙▄▄▖▝▚▄▄▄ 
+                                         
+              version {mlc_version} 
                  MIT License
     Copyright (c) AIME GmbH and affiliates.                               
         {RESET}"""
-aime_logo1 = f"""{AIME_LOGO}
-         ▗▄▖ ▗▄▄▄▖▗▖  ▗▖▗▄▄▄▖    ▗▖  ▗▖▗▖    ▗▄▄▖
-        ▐▌ ▐▌  █  ▐▛▚▞▜▌▐▌       ▐▛▚▞▜▌▐▌   ▐▌   
-        ▐▛▀▜▌  █  ▐▌  ▐▌▐▛▀▀▘    ▐▌  ▐▌▐▌   ▐▌   
-        ▐▌ ▐▌▗▄█▄▖▐▌  ▐▌▐▙▄▄▖    ▐▌  ▐▌▐▙▄▄▖▝▚▄▄▖                                       
-                     version {mlc_version} 
-                     MIT License
-        Copyright (c) AIME GmbH and affiliates.                               
-        {RESET}"""
-
 
 def get_flags():
     """_summary_
@@ -75,7 +66,7 @@ def get_flags():
     """
     parser = argparse.ArgumentParser(
         #description=f'{AIME_LOGO}Manage machine learning containers (mlc).{RESET}',
-        description=f'{aime_logo} \n{AIME_LOGO}AIME Machine Learning Container management system.\nEasily install, run and manage Docker containers\nfor Pytorch and Tensorflow deep learning frameworks.{RESET}',
+        description=f'{aime_copyright_claim} {AIME_LOGO}AIME Machine Learning Container management system.\nEasily install, run and manage Docker containers\nfor Pytorch and Tensorflow deep learning frameworks.{RESET}',
         usage = "mlc [-h] [-v] <command> [-h]",
         formatter_class = argparse.RawTextHelpFormatter  
     )
@@ -139,7 +130,30 @@ def get_flags():
     parser_list.add_argument(
         '-a', '--all', 
         action = "store_true", 
-        help='List of the created container/s by all users'
+        help='Show the full info of the created container/s by all users'
+    )
+    parser_list.add_argument(
+        '-s', '--size', 
+        action = "store_true", 
+        help='Show the size of every container'
+    )
+    
+    parser_list.add_argument(
+        '-d', '--data', 
+        action = "store_true", 
+        help="Show the data's directories of every container"
+    )
+    
+    parser_list.add_argument(
+        '-m', '--models', 
+        action = "store_true", 
+        help="Show the models' directories of every container"
+    )
+    
+    parser_list.add_argument(
+        '-w', '--workspace', 
+        action = "store_true", 
+        help="Show the workspace's directories of every container"
     )
 
     # Parser for the "open" command
@@ -816,6 +830,7 @@ def are_you_sure(selected_container_name, command):
 
     while True:
         are_you_sure_answer = input(f"\n{INPUT}[{selected_container_name}]{RESET} {REQUEST}will be {printed_verb}. Are you sure(y/N)?: {RESET}").strip().lower()
+        
         if are_you_sure_answer in ["y", "yes"]:                          
 
             break
@@ -823,9 +838,11 @@ def are_you_sure(selected_container_name, command):
         elif are_you_sure_answer in ["n", "no", ""]:
             
             print(f"\n{INPUT}[{selected_container_name}]{RESET} {INFO}will not be {printed_verb}.\n{RESET}")
+            
             exit(0)
             
         else:
+            
             print(f"{ERROR}\nInvalid input. Please use y(yes) or n(no).{RESET}") 
 
 
@@ -871,6 +888,122 @@ def filter_running_containers(running_containers, *lists):
     return (*no_running_results, no_running_length, *running_results, running_length)
 
     
+def print_info_header(command):
+    """
+
+    Args:
+        command (_type_): _description_
+    """       
+    
+    if command == "create":
+        print(
+            "\n" \
+            f"    {INFO_HEADER}Info{RESET}: \
+            \n    Create a new container \
+            \n\n    {INFO_HEADER}Correct Usage{RESET}: \
+            \n    mlc create <container_name> <framework_name> <framework_version> -w /home/$USER/workspace -d /data -ng 1 \
+            \n\n    {INFO_HEADER}Example{RESET}: \
+            \n    mlc create pt231aime Pytorch 2.3.1-aime -w /home/user_name/workspace -d /data -ng 1\n" 
+        )  
+    if command == "export":
+        #print("comming soon")
+                
+        print(
+            "\n" \
+            f"    {INFO_HEADER}Info{RESET}: \
+            \n    Export an existing container/image \
+            \n\n    {INFO_HEADER}Correct Usage{RESET}: \
+            \n    mlc export <container_name> <name_of_exported_container> <location_of_exported_container_and_image>  \
+            \n\n    {INFO_HEADER}Example{RESET}: \
+            \n    mlc export pt231aime pt231_llama /home/user_name/workspace/ \n" 
+        )  
+        
+    if command == "import":
+        #print("comming soon")
+        
+        print(
+            "\n" \
+            f"    {INFO_HEADER}Info{RESET}: \
+            \n    Import an existing container/image \
+            \n\n    {INFO_HEADER}Correct Usage{RESET}: \
+            \n    mlc import <name_of_imported_container> <name_of_exported_container> <location_of_imported_container_and_image>  \
+            \n\n    {INFO_HEADER}Example{RESET}: \
+            \n    mlc import pt231_llama pt231_llama_test /home/user_name/workspace/ \n" 
+        )   
+        
+        
+    if command == "list":
+        
+        print(
+            "\n"\
+            f"    {INFO_HEADER}Info{RESET}: \
+            \n    List of created containers  \
+            \n\n    {INFO_HEADER}Correct Usage{RESET}: \
+            \n    mlc list  [-a|--all] [-s|--size] [-w|--workspace] [-d|--data] [-m|--models]\
+            \n\n    {INFO_HEADER}Example{RESET}: \
+            \n    mlc list -a\n"
+        )
+        
+        
+    if command == "open":
+        print(
+            "\n"\
+            f"    {INFO_HEADER}Info{RESET}: \
+            \n    Open an existing machine learning container  \
+            \n\n    {INFO_HEADER}Correct Usage{RESET}: \
+            \n    mlc open <container_name>  \
+            \n\n    {INFO_HEADER}Example{RESET}: \
+            \n    mlc open pt231aime\n"
+        )
+        
+    if command == "remove":
+        print(
+            "\n"\
+            f"    {INFO_HEADER}Info{RESET}: \
+            \n    Remove an existing and no running machine learning container  \
+            \n\n    {INFO_HEADER}Correct Usage{RESET}: \
+            \n    mlc remove <container_name>  [-fr | --force_remove]\
+            \n\n    {INFO_HEADER}Example{RESET}: \
+            \n    mlc remove pt231aime -fr\n"
+        )   
+
+    if command == "start":        
+        print(
+            "\n"\
+            f"    {INFO_HEADER}Info{RESET}: \
+            \n    Start an existing machine learning container  \
+            \n\n    {INFO_HEADER}Correct Usage{RESET}: \
+            \n    mlc start <container_name>  \
+            \n\n    {INFO_HEADER}Example{RESET}: \
+            \n    mlc start pt231aime\n"
+        )
+        
+    if command == "stats":
+        print("to be added!!")
+
+    if command == "stop":        
+        print(
+            "\n"\
+            f"    {INFO_HEADER}Info{RESET}: \
+            \n    Stop an existing machine learning container  \
+            \n\n    {INFO_HEADER}Correct Usage{RESET}: \
+            \n    mlc stop <container_name> [-fs | --force_stop]\
+            \n\n    {INFO_HEADER}Example{RESET}: \
+            \n    mlc stop pt231aime -fs\n"
+        )  
+
+    if command == "update-sys":
+        print(
+            "\n"\
+            f"    {INFO_HEADER}Info{RESET}: \
+            \n    Update the system  \
+            \n\n    {INFO_HEADER}Correct Usage{RESET}: \
+            \n    mlc update-sys [-fu | --force_update]\
+            \n\n    {INFO_HEADER}Example{RESET}: \
+            \n    mlc update-sys -fu\n"
+        )  
+        
+    
         
 ###############################################################################################################################################################################################
 ###############################################################################################################################################################################################
@@ -899,17 +1032,18 @@ def main():
         if args.command == 'create':
 
             if args.container_name is None and args.framework is None and args.version is None:
-                                
+                print_info_header(args.command)
+                """ 
                 print(
-                    "\n" + '_'*100 + "\n" \
-                    f"\t{INFO}Info{RESET}: \
-                    \n\tCreate a new container. \
-                    \n\t{INFO}Correct Usage{RESET}: \
-                    \n\tmlc create <container_name> <framework_name> <framework_version> -w /home/$USER/workspace -d /data -ng 1 \
-                    \n\t{INFO}Example{RESET}: \
-                    \n\tmlc create pt231aime Pytorch 2.3.1-aime -w /home/user_name/workspace -d /data -ng 1\n" + '_'*100
+                    "\n" \
+                    f"    {GREEN}Info{RESET}: \
+                    \n    Create a new container. \
+                    \n\n    {GREEN}Correct Usage{RESET}: \
+                    \n    mlc create <container_name> <framework_name> <framework_version> -w /home/$USER/workspace -d /data -ng 1 \
+                    \n\n    {GREEN}Example{RESET}: \
+                    \n    mlc create pt231aime Pytorch 2.3.1-aime -w /home/user_name/workspace -d /data -ng 1\n" 
                 )                
-
+                """
             # User provides the container name and is validated
             validated_container_name = get_container_name(args.container_name, user_name, args.command)
                         
@@ -1222,13 +1356,19 @@ def main():
             
             print(f"{INFO}\nNot yet implemented. Coming soon!{RESET}\n")
             
+            print_info_header(args.command) 
+            
         if args.command == 'import':
             
             print(f"\n{INFO}Not yet implemented. Coming soon!{RESET}\n")
+            
+            print_info_header(args.command) 
                         
-        if args.command == 'list':            
+        if args.command == 'list':
+                   
+            print_info_header(args.command)          
     
-                show_container_info(args.all)                    
+            show_container_info(args.all)                    
             
         if args.command == 'open':           
             
@@ -1248,6 +1388,10 @@ def main():
                     selected_container_position = available_user_containers.index(args.container_name) + 1
                     print(f'\n{INFO}Provided container name {RESET}{INPUT}[{args.container_name}]{RESET}{INFO} exists and will be opened.{RESET}')                   
             else:
+                
+                print_info_header(args.command)
+
+                """
                 print(
                     "\n" + '_'*100 + "\n" \
                     f"\t{INFO}Info{RESET}: \
@@ -1257,6 +1401,7 @@ def main():
                     \n\t{INFO}Example{RESET}: \
                     \n\tmlc open pt231aime\n" + '_'*100
                 )
+                """              
 
                 # ToDo: create a function ( the same 4 lines as above)
                 print(f"\n{INFO}Available containers of the current user:{RESET}")
@@ -1370,12 +1515,19 @@ def main():
                         break       
                     
                                       
-            else:    
+            else:  
+                
+                print_info_header(args.command) 
+                 
                 # check that at least 1 container is no running
                 if no_running_container_number == 0:
                     print(f"\n{ERROR}All containers are running.\nIf you want to remove a container, stop it before using:{RESET}{HINT}\nmlc stop container_name{RESET}")
                     show_container_info(False)
                     exit(0)
+                
+
+
+                """
                 print(
                     "\n" + '_'*100 + "\n" \
                     f"\t{INFO}Info{RESET}: \
@@ -1384,7 +1536,8 @@ def main():
                     \n\tmlc remove <container_name>  [-fr | --force_remove]\
                     \n\t{INFO}Example{RESET}: \
                     \n\tmlc remove pt231aime [-fr | --force_remove]\n" + '_'*100
-                )    
+                 )    
+                """    
 
                 # ToDo: create a function ( the same 4 lines as below)
                 print(f"\n{INFO}The following no running containers of the current user can be removed:{RESET}")
@@ -1478,12 +1631,19 @@ def main():
                         print(f"\n{INFO}Selected container to be started:{RESET} {INPUT}{selected_container_name}{RESET}")    
                         break                      
             else:
+                
+                print_info_header(args.command)
+                
                 if no_running_container_number == 0:
                     print(
                         f"{ERROR}\nAt the moment all containers are running.\nCreate a new one and start it using:{RESET}\n{HINT}mlc start container_name{RESET}"
                     )
                     show_container_info(False) 
                     exit(0)
+                
+
+                
+                """   
                 print(
                     "\n" + '_'*100 + "\n" \
                     f"\t{INFO}Info{RESET}: \
@@ -1493,6 +1653,7 @@ def main():
                     \n\t{INFO}Example{RESET}: \
                     \n\tmlc start pt231aime\n" + '_'*100
                 )   
+                """                
 
                 # ToDo: create a function ( the same 4 lines as below)
                 print(f"\n{INFO}The following no running containers of the current user can be started:{RESET}")
@@ -1598,6 +1759,10 @@ def main():
                     print(f"\n{ERROR}All containers are stopped. Therefore there are no one to be stopped.{RESET}")
                     show_container_info(False)
                     exit(0)
+                    
+                print_info_header(args.command)
+
+                """
                 print(
                     "\n" + '_'*100 + "\n" \
                     f"\t{INFO}Info{RESET}: \
@@ -1607,7 +1772,7 @@ def main():
                     \n\t{INFO}Example{RESET}: \
                     \n\tmlc stop pt231aime [-fs | --force_stop]\n" + '_'*100
                 )    
-
+                """
                 # ToDo: create a function ( the same 4 lines as below)
                 print(f"\n{INFO}Running containers of the current user:{RESET}")
                 print_existing_container_list(running_containers)
