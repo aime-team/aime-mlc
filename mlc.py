@@ -46,6 +46,10 @@ AIME_LOGO = "\033[38;5;214m"# Light orange
 
 MAGENTA = "\033[95m"        # Magenta
 BLUE = "\033[94m"           # Blue
+TITLE = "\033[34m"          # Blue
+FOOTER = "\033[36m"         # Light Blue
+ACCENT = "\033[95m"         # Pink (Bright Magenta)
+SUCCESS = "\033[32m"        # Dark Green
 
 aime_copyright_claim = f"""{AIME_LOGO}
      ▗▄▄▖   ▄  ▗▖  ▗▖ ▄▄▄▖    ▗▖  ▗▖▗▖    ▗▄▄▄
@@ -56,7 +60,7 @@ aime_copyright_claim = f"""{AIME_LOGO}
               version {mlc_version} 
                  MIT License
     Copyright (c) AIME GmbH and affiliates.                               
-        {RESET}"""
+    {RESET}"""
 
 def get_flags():
     """_summary_
@@ -66,7 +70,7 @@ def get_flags():
     """
     parser = argparse.ArgumentParser(
         #description=f'{AIME_LOGO}Manage machine learning containers (mlc).{RESET}',
-        description=f'{aime_copyright_claim} {AIME_LOGO}AIME Machine Learning Container management system.\nEasily install, run and manage Docker containers\nfor Pytorch and Tensorflow deep learning frameworks.{RESET}',
+        description=f'{aime_copyright_claim}{AIME_LOGO}AIME Machine Learning Container management system.\nEasily install, run and manage Docker containers\nfor Pytorch and Tensorflow deep learning frameworks.{RESET}',
         usage = "mlc [-h] [-v] <command> [-h]",
         formatter_class = argparse.RawTextHelpFormatter  
     )
@@ -82,7 +86,7 @@ def get_flags():
     subparsers = parser.add_subparsers(dest='command', required=False, help='Sub-command to execute')
 
     # Parser for the "create" command
-    parser_create = subparsers.add_parser('create', help='Create a new container')
+    parser_create = subparsers.add_parser('create', help='Create a new container', usage = "mlc create [-h]")
     parser_create.add_argument(
         'container_name', 
         nargs='?', 
@@ -111,6 +115,11 @@ def get_flags():
         '-d', '--data_dir', 
         type=str, 
         help='Location of the data directory.'
+    )
+    parser_create.add_argument(
+        '-m', '--models_dir', 
+        type=str, 
+        help='Location of the models directory.'
     )
     parser_create.add_argument(
         '-ng', '--num_gpus', 
@@ -157,7 +166,13 @@ def get_flags():
     )
 
     # Parser for the "open" command
-    parser_open = subparsers.add_parser('open', help='Open an existing container')
+    parser_open = subparsers.add_parser(
+        'open', 
+        description= "Open an existing container",
+        help='Open an existing container', 
+        usage = f"{INPUT}mlc open container_name{RESET}",
+        formatter_class = argparse.RawTextHelpFormatter
+    )
     parser_open.add_argument(
         'container_name', 
         nargs = '?', 
@@ -327,20 +342,22 @@ def run_docker_command1(docker_command):
     result = subprocess.run(docker_command, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     return result.stdout.strip(), result.stderr.strip(), result.returncode
 '''
-
+"""
 def check_container_exists(container_name):
-    """Check if the container exists.
+    """"""Check if the container exists.
 
     Args:
         container_name (_type_): _description_
 
     Returns:
         _type_: _description_
-    """    
+    """"""    
 
     docker_command = f'docker container ps -a --filter=name=^/{container_name}$ --filter=label=aime.mlc --format "{{{{.Names}}}}"'
     output, _, _ = run_docker_command(docker_command)
     return output
+"""
+
 #####-------------------------------
 def print_existing_container_list(container_list):
     """
@@ -597,19 +614,31 @@ def get_container_name(container_name, user_name, command):
         _type_: _description_
     """
 
-    available_user_containers, _ = existing_user_containers(user_name, command)  
-    
     if container_name is not None:
-        return validate_container_name(container_name)
+
+        while True:
+
+            try: 
+                
+                return validate_container_name(container_name, command)
+            
+            except ValueError as e:
+                
+                print(e)
+                #show_container_info(False)
+                container_name = input(f"\n{REQUEST}Enter a container name (valid characters: a-z, A-Z, 0-9, _,-,#): {RESET}")
+
     else:
         while True:                           
             container_name = input(f"\n{REQUEST}Enter a container name (valid characters: a-z, A-Z, 0-9, _,-,#): {RESET}")
+            """
             if container_name in available_user_containers:
                 print(f'\n{INPUT}[{container_name}]{RESET} {ERROR}already exists. Provide a new container name.{RESET}')
                 show_container_info(False)
                 continue
+            """
             try:
-                return validate_container_name(container_name)
+                return validate_container_name(container_name, command)
             except ValueError as e:
                 print(e)
 
@@ -640,7 +669,7 @@ def existing_user_containers(user_name, mlc_command):
     return container_names, container_tags
 
 
-def validate_container_name(container_name):
+def validate_container_name(container_name, command):
     """_summary_
 
     Args:
@@ -652,13 +681,30 @@ def validate_container_name(container_name):
     Returns:
         _type_: _description_
     """
+    _ , available_user_container_tags = existing_user_containers(user_name, command) 
     
     pattern = re.compile(r'^[a-zA-Z0-9_\-#]*$')
-    if not pattern.match(container_name):
+
+    if container_name == "":
+        
+        raise ValueError(f"\n{ERROR}The container name should contain at least one character.{RESET}")
+    
+    elif not pattern.match(container_name):
         invalid_chars = [char for char in container_name if not re.match(r'[a-zA-Z0-9_\-#]', char)]
         invalid_chars_str = ''.join(invalid_chars)
-        raise ValueError(f"The container name {INPUT}{container_name}{RESET} contains {ERROR}invalid{RESET} characters: {ERROR}{invalid_chars_str}{RESET}")
-    return container_name
+        raise ValueError(f"\n{INPUT}[{container_name}]{RESET} contains {ERROR}invalid{RESET} characters: {ERROR}{invalid_chars_str}{RESET}")
+    else:
+        # Generate a unique container tag
+        provided_container_tag = f"{container_name}._.{user_id}"
+        
+        if provided_container_tag in available_user_container_tags:
+            raise ValueError(f'\n{INPUT}[{container_name}]{RESET} {ERROR}already exists. Provide a new container name.{RESET}')
+
+            #print(f"\n{INPUT}[{validated_container_name}]{RESET} {ERROR}already exists.{RESET}")
+
+            #exit(1)
+        
+        return container_name, provided_container_tag
 
 def show_container_info(args_all):
     """_summary_
@@ -811,9 +857,14 @@ def are_you_sure(selected_container_name, command):
         selected_container_name (_type_): _description_
         command (_type_): _description_
     """
+    
+    if command == "create":
+        
+        print(f"\n{WARNING}Verify if the provided setup is correct. The creation of a container may take a little time.{RESET}")
 
+        printed_verb = command + "d"
   
-    if command == "remove":
+    elif command == "remove":
         
         print(f"\n{WARNING}Caution: After your selection, there is no option to recover the container.{RESET}")
         
@@ -900,10 +951,10 @@ def print_info_header(command):
             "\n" \
             f"    {INFO_HEADER}Info{RESET}: \
             \n    Create a new container \
-            \n\n    {INFO_HEADER}Correct Usage{RESET}: \
-            \n    mlc create <container_name> <framework_name> <framework_version> -w /home/$USER/workspace -d /data -ng 1 \
+            \n\n    {INFO_HEADER}How to use{RESET}: \
+            \n    mlc create <container_name> <framework_name> <framework_version> -w <workspace_directory> -d <data_directory> -m <models_directory> -ng 1 \
             \n\n    {INFO_HEADER}Example{RESET}: \
-            \n    mlc create pt231aime Pytorch 2.3.1-aime -w /home/user_name/workspace -d /data -ng 1\n" 
+            \n    mlc create pt231aime Pytorch 2.3.1-aime -w /home/$USER/workspace -d /data -m /home/$USER/models -ng 1\n" 
         )  
     if command == "export":
         #print("comming soon")
@@ -912,7 +963,7 @@ def print_info_header(command):
             "\n" \
             f"    {INFO_HEADER}Info{RESET}: \
             \n    Export an existing container/image \
-            \n\n    {INFO_HEADER}Correct Usage{RESET}: \
+            \n\n    {INFO_HEADER}How to use{RESET}: \
             \n    mlc export <container_name> <name_of_exported_container> <location_of_exported_container_and_image>  \
             \n\n    {INFO_HEADER}Example{RESET}: \
             \n    mlc export pt231aime pt231_llama /home/user_name/workspace/ \n" 
@@ -925,7 +976,7 @@ def print_info_header(command):
             "\n" \
             f"    {INFO_HEADER}Info{RESET}: \
             \n    Import an existing container/image \
-            \n\n    {INFO_HEADER}Correct Usage{RESET}: \
+            \n\n    {INFO_HEADER}How to use{RESET}: \
             \n    mlc import <name_of_imported_container> <name_of_exported_container> <location_of_imported_container_and_image>  \
             \n\n    {INFO_HEADER}Example{RESET}: \
             \n    mlc import pt231_llama pt231_llama_test /home/user_name/workspace/ \n" 
@@ -938,7 +989,7 @@ def print_info_header(command):
             "\n"\
             f"    {INFO_HEADER}Info{RESET}: \
             \n    List of created containers  \
-            \n\n    {INFO_HEADER}Correct Usage{RESET}: \
+            \n\n    {INFO_HEADER}How to use{RESET}: \
             \n    mlc list  [-a|--all] [-s|--size] [-w|--workspace] [-d|--data] [-m|--models]\
             \n\n    {INFO_HEADER}Example{RESET}: \
             \n    mlc list -a\n"
@@ -950,7 +1001,7 @@ def print_info_header(command):
             "\n"\
             f"    {INFO_HEADER}Info{RESET}: \
             \n    Open an existing machine learning container  \
-            \n\n    {INFO_HEADER}Correct Usage{RESET}: \
+            \n\n    {INFO_HEADER}How to use{RESET}: \
             \n    mlc open <container_name>  \
             \n\n    {INFO_HEADER}Example{RESET}: \
             \n    mlc open pt231aime\n"
@@ -961,7 +1012,7 @@ def print_info_header(command):
             "\n"\
             f"    {INFO_HEADER}Info{RESET}: \
             \n    Remove an existing and no running machine learning container  \
-            \n\n    {INFO_HEADER}Correct Usage{RESET}: \
+            \n\n    {INFO_HEADER}How to use{RESET}: \
             \n    mlc remove <container_name>  [-fr | --force_remove]\
             \n\n    {INFO_HEADER}Example{RESET}: \
             \n    mlc remove pt231aime -fr\n"
@@ -972,7 +1023,7 @@ def print_info_header(command):
             "\n"\
             f"    {INFO_HEADER}Info{RESET}: \
             \n    Start an existing machine learning container  \
-            \n\n    {INFO_HEADER}Correct Usage{RESET}: \
+            \n\n    {INFO_HEADER}How to use{RESET}: \
             \n    mlc start <container_name>  \
             \n\n    {INFO_HEADER}Example{RESET}: \
             \n    mlc start pt231aime\n"
@@ -986,7 +1037,7 @@ def print_info_header(command):
             "\n"\
             f"    {INFO_HEADER}Info{RESET}: \
             \n    Stop an existing machine learning container  \
-            \n\n    {INFO_HEADER}Correct Usage{RESET}: \
+            \n\n    {INFO_HEADER}How to use{RESET}: \
             \n    mlc stop <container_name> [-fs | --force_stop]\
             \n\n    {INFO_HEADER}Example{RESET}: \
             \n    mlc stop pt231aime -fs\n"
@@ -997,7 +1048,7 @@ def print_info_header(command):
             "\n"\
             f"    {INFO_HEADER}Info{RESET}: \
             \n    Update the system  \
-            \n\n    {INFO_HEADER}Correct Usage{RESET}: \
+            \n\n    {INFO_HEADER}How to use{RESET}: \
             \n    mlc update-sys [-fu | --force_update]\
             \n\n    {INFO_HEADER}Example{RESET}: \
             \n    mlc update-sys -fu\n"
@@ -1019,8 +1070,10 @@ def main():
        
         if not args.command:
             print(f"\nUse {INPUT}mlc -h{RESET} or {INPUT}mlc --help{RESET} to get more informations about the AIME MLC tool.\n")
-        elif args.command not in available_commands:
-            print("Hallo")
+        #ToDo: verify if needed
+        #elif args.command not in available_commands:
+        #    print("Hallo")
+        
         # Read and save content of ml_images.repo
         # OLD: repo_file = os.path.join(os.path.dirname(__file__), repo_name)
         repo_file = Path(__file__).parent / repo_name
@@ -1030,44 +1083,27 @@ def main():
         framework_version_docker_sorted = dict(sorted(framework_version_docker.items()))
         
         if args.command == 'create':
-
-            if args.container_name is None and args.framework is None and args.version is None:
-                print_info_header(args.command)
-                """ 
-                print(
-                    "\n" \
-                    f"    {GREEN}Info{RESET}: \
-                    \n    Create a new container. \
-                    \n\n    {GREEN}Correct Usage{RESET}: \
-                    \n    mlc create <container_name> <framework_name> <framework_version> -w /home/$USER/workspace -d /data -ng 1 \
-                    \n\n    {GREEN}Example{RESET}: \
-                    \n    mlc create pt231aime Pytorch 2.3.1-aime -w /home/user_name/workspace -d /data -ng 1\n" 
-                )                
-                """
-            # User provides the container name and is validated
-            validated_container_name = get_container_name(args.container_name, user_name, args.command)
-                        
+            
             # List existing containers of the current user
             available_user_containers, available_user_container_tags = existing_user_containers(user_name, args.command)
             
-            # Generate a unique container tag
-            provided_container_tag = f"{validated_container_name}._.{user_id}"
-            
-            if provided_container_tag in available_user_container_tags:
-                print(f"\n{INPUT}[{validated_container_name}]{RESET} {ERROR}already exists.{RESET}")
-                show_container_info(False)
-                sys.exit(-1)
+            # Needed to know if the workspace, data and models directories should be asked 
+            workspace_dir_be_asked= data_dir_be_asked = models_dir_be_asked = False
 
+            if args.container_name is None and args.framework is None and args.version is None:
+                print_info_header(args.command)
+                workspace_dir_be_asked = data_dir_be_asked = models_dir_be_asked = True
+
+            # User provides the container name and is validated        
+            validated_container_name, validated_container_tag = get_container_name(args.container_name, user_name, args.command)
+            
             # Framework selection:
             if args.framework is None:            
-                while args.framework is None:
-                    #framework_list = framework_version_docker_sorted.keys()
-                    
+                while args.framework is None:                   
                     framework_list = display_frameworks(framework_version_docker_sorted)
                     framework_num = get_user_selection(f"{REQUEST}Enter the number of the desired framework: {RESET}", len(framework_list))
                     args.framework = framework_list[framework_num - 1]
             else:    
-                #available_frameworks = framework_version_docker_sorted.keys()
                 while True:
                     if not framework_version_docker_sorted.get(args.framework):
                         framework_list = display_frameworks(framework_version_docker_sorted)
@@ -1080,15 +1116,14 @@ def main():
                 
             # Version selection:
             versions_images = framework_version_docker_sorted[selected_framework]
+
             if args.version is None:
                 while args.version is None:  
                     display_versions(selected_framework, versions_images)
                     version_number = get_user_selection(f"{REQUEST}Enter the number of your version: {RESET}", len(versions_images))
                     # Version and docker image selected
                     args.version, selected_docker_image = versions_images[version_number - 1]
-                workspace_be_asked= data_dir_be_asked = models_be_asked = True
-            else:
-                workspace_be_asked= data_dir_be_asked = models_be_asked = False
+            else:                
                 available_versions = [version[0] for version in versions_images]
                 while True:
                     if args.version in available_versions:
@@ -1099,27 +1134,48 @@ def main():
                         version_number = get_user_selection(f"{REQUEST}Enter the number of your version: {RESET}", len(versions_images))
                         # Version and docker image selected
                         args.version, selected_docker_image = versions_images[version_number - 1]
-            
             selected_version = args.version
             
+            ###################################################
             # Workspace directory selection:
             # Default workspace directory
-            default_workspace_dir = os.path.expanduser('~/workspace')
+            default_workspace_dir = os.path.expanduser('~/workspace') 
+            workspace_dir_updated = False
+          
+            # If the -w option is provided, check the user-provided path
+            if args.workspace_dir:
+                provided_workspace_dir = os.path.expanduser(args.workspace_dir)
+                while True:
+                    # Check if the provided workspace directory exists:
+                    if os.path.isdir(provided_workspace_dir):
+                        break
+                    else:
+                        print(f"\n{ERROR}Workspace directory does not exist:{RESET} {INPUT}{provided_workspace_dir}{RESET}")
+                        provided_workspace_dir = os.path.expanduser(input(f"\n{REQUEST}Provide the new location of the workspace directory: {RESET}").strip())
+                workspace_dir = provided_workspace_dir
+                workspace_dir_updated = True
+                #workspace_dir_be_asked = False
+            else:
+                #workspace_dir_be_asked = False
+                workspace_dir = default_workspace_dir
             
-            if workspace_be_asked:
+            #print({workspace_dir_be_asked})
+                        
+            if workspace_dir_be_asked:
                 workspace_message = (
                     f"\n{INFO}The workspace directory would be mounted by default as /workspace in the container.{RESET}"
                     f"\n{INFO}It is the directory where your project data should be stored to be accessed inside the container.{RESET}"
                     f"\n{HINT}HINT: It can be set to an existing directory with the option '-w /your_workspace'{RESET}"
                 )
-                #print(f"\n{INFO}The workspace directory would be mounted by default as /workspace in the container.{RESET}")
-                #print(f"{INFO}It is the directory where your project data should be stored to be accessed inside the container.{RESET}")
-                #print(f"{HINT}HINT: It can be set to an existing directory with the option '-w /your_workspace'{RESET}")
                 print(f"{workspace_message}")
-                keep_workspace_dir = input(f"\n{REQUEST}Current workspace location:{default_workspace_dir}. Keep it (Y/n)?: {RESET}").strip()
+                
                 # Define a variable to control breaking out of both loops
                 break_inner_loop = False
+                
                 while True:
+                    
+                    keep_workspace_dir = input(f"\n{REQUEST}Current workspace location:{default_workspace_dir}. Keep it (Y/n)?: {RESET}").strip().lower()
+
                     if keep_workspace_dir in ["y","yes",""]:
                         #print(f'\n{INFO}Workspace directory:{RESET} {INPUT}{default_workspace_dir}{RESET}')
                         workspace_dir = default_workspace_dir
@@ -1129,72 +1185,67 @@ def main():
                             provided_workspace_dir = os.path.expanduser(input(f"\n{REQUEST}Provide the new location of the workspace directory: {RESET}").strip())  # Expand '~' to full path
                             # Check if the provided workspace directory exist:
                             if os.path.isdir(provided_workspace_dir):
-                                print(f'\n{INFO}Workspace directory changed to:{RESET} {INPUT}{provided_workspace_dir}{RESET}')
+                                #print(f'\n{INFO}Workspace directory changed to:{RESET} {INPUT}{provided_workspace_dir}{RESET}')
                                 workspace_dir = provided_workspace_dir
                                 break_inner_loop = True
                                 break
                             else:
-                                print(f"\n{ERROR}Workspace directory not existing:{RESET} {INPUT}{provided_workspace_dir}{RESET}") 
+                                print(f"\n{ERROR}Workspace directory does not exist:{RESET} {INPUT}{provided_workspace_dir}{RESET}") 
                         if break_inner_loop:
                             break                           
                     else:
                         print(f"{ERROR}\nInvalid input. Please use y(yes) or n(no).{RESET}")
-                        #break
+
             else:
-                # If the -w option is not provided
-                workspace_dir = default_workspace_dir            
-          
-            if args.workspace_dir:
-                # If the -w option is provided, use the user-provided path
-                provided_workspace_dir = os.path.expanduser(args.workspace_dir)
+                if not workspace_dir_updated:
+                    workspace_dir = default_workspace_dir    
+               
+            ###################################################
+            # Data directory selection:     
+            default_data_dir = "-"
+            data_dir_updated = False
+
+            # Check if the provided data directory exists:
+            if args.data_dir:
+                provided_data_dir = os.path.expanduser(args.data_dir)
                 while True:
-                    # Check if the provided workspace directory exist:
-                    if os.path.isdir(provided_workspace_dir):
+                    # Check if the provided data directory exists:
+                    if os.path.isdir(provided_data_dir):
                         break
                     else:
-                        print(f"\n{ERROR}Workspace directory not existing:{RESET} {INPUT}{provided_workspace_dir}{RESET}")
-                        provided_workspace_dir = os.path.expanduser(input(f"\n{REQUEST}Provide the new location of the workspace directory: {RESET}").strip())
-                workspace_dir = provided_workspace_dir
-                print(f'\n{INFO}Workspace directory changed to:{RESET} {INPUT}{provided_workspace_dir}{RESET}')
- 
-            args.workspace_dir = workspace_dir          
-            # ToDO: check the below condition. It looks like the condition will be nevel fullfilled.           
-            # Check if the provided workspace directory exist:
-            if os.path.isdir(args.workspace_dir):
-                print(f"\n{INFO}/workspace will be mounted on:{RESET} {INPUT}{args.workspace_dir}{RESET}")
+                        print(f"\n{ERROR}Data directory does not exist:{RESET} {INPUT}{provided_data_dir}{RESET}")
+                        provided_data_dir = os.path.expanduser(input(f"\n{REQUEST}Provide the new location of the data directory: {RESET}").strip())
+                data_dir = provided_data_dir
+                data_dir_updated = True
+                #data_dir_be_asked = False
             else:
-                workspace_aborted_message = f"\n{ERROR}Aborted.\n\nWorkspace directory not existing:{RESET} {INPUT}{args.workspace_dir}{RESET}" + workspace_message
-                print(f"{workspace_aborted_message}")
-                #print(f"\n{ERROR}Aborted.\n\nWorkspace directory not existing:{RESET} {INPUT}{args.workspace_dir}{RESET}")
-                #print(f"\n{INFO}The workspace directory would be mounted as /workspace in the container.{RESET}")
-                #print(f"\n{INFO}It is the directory where your project data should be stored to be accessed\ninside the container.{RESET}")
-                #print(f"\n{INFO}It can be set to an existing directory with the option '-w /your_workspace'{RESET}")
-                sys.exit(-1)
-            
-            # Data directory:            
+                #data_dir_be_asked = False
+                data_dir = default_data_dir                            
+              
+            #print({data_dir_be_asked})                                  
             if data_dir_be_asked:
                 data_message = (
                     f"\n{INFO}The data directory would be mounted as /data in the container.{RESET}"
                     f"\n{INFO}It is the directory where data sets, for example, mounted from\nnetwork volumes can be accessed inside the container.{RESET}"
                     f"\n{HINT}HINT: It can be set to an existing directory with the option '-d /your_data_directory'{RESET}"
                 )
-                #print(f"\n{INFO}The data directory would be mounted as /data in the container.{RESET}")
-                #print(f"\n{INFO}It is the directory where data sets, for example, mounted from\nnetwork volumes can be accessed inside the container.{RESET}")
-                #print(f"{HINT}HINT: It can be set to an existing directory with the option '-d /your_data_directory'{RESET}")
                 print(f"{data_message}")
-                provide_data_dir = input(f"\n{REQUEST}Do you want to provide a data directory (y/N)?: {RESET}").strip()
+
                 # Define a variable to control breaking out of both loops
                 break_inner_loop = False
                 while True:
+                    
+                    provide_data_dir = input(f"\n{REQUEST}Do you want to provide a data directory (y/N)?: {RESET}").strip().lower()
+
                     if provide_data_dir in ["n","no", ""]:
-                        print(f'\n{INFO}Data directory:{RESET} {INPUT}-{RESET}')
+                        ##print(f'\n{INFO}Data directory:{RESET} {INPUT}{data_dir}{RESET}')
                         break
                     elif provide_data_dir in ["y","yes"]:
                         while True:
                             provided_data_dir = os.path.expanduser(input(f"\n{REQUEST}Provide the new location of the data directory: {RESET}").strip())  # Expand '~' to full path
                             # Check if the provided data directory exists:
                             if os.path.isdir(provided_data_dir):
-                                print(f'\n{INFO}Data directory will be:{RESET} {INPUT}{provided_data_dir}{RESET}')
+                                ##print(f'\n{INFO}Data directory will be:{RESET} {INPUT}{provided_data_dir}{RESET}')
                                 data_dir = provided_data_dir
                                 break_inner_loop = True
                                 break
@@ -1204,35 +1255,97 @@ def main():
                             break                           
                     else:
                         print(f"{ERROR}\nInvalid input. Please use y(yes) or n(no).{RESET}")
-                        break
+                        
             else:
-                # If the -w option is not provided
-                print(f"\n{INFO}Data directory:{RESET} {INPUT}-{RESET}")
-            
-            ###################################################
-            # Check if the provided data directory exists:
-            if args.data_dir:
-                data_dir = os.path.realpath(args.data_dir)
-                if os.path.isdir(data_dir):
-                    print(f"\n{INFO}/data will be mounted on:{RESET} {INPUT}{data_dir}{RESET}")
-                else:
-                    print(f"\n{ERROR}Aborted.\n\nData directory not existing: {data_dir}{RESET}")
-                    print(f"\n{INFO}The data directory would be mounted as /data in the container.{RESET}")
-                    print(f"\n{INFO}It is the directory where data sets, for example, mounted from\nnetwork volumes can be accessed inside the container.{RESET}")
-                    sys.exit(-1)           
-            
-            print(f"\n{INFO}Selected Framework and Version:{RESET} {INPUT}{selected_framework} {selected_version}{RESET}")
-            
+                if not data_dir_updated:
+                    data_dir = default_data_dir  
 
+            ###################################################
+            # Models directory selection:     
+            default_models_dir = "-"
+            models_dir_updated = False
+
+            # Check if the provided models directory exists:
+            if args.models_dir:
+                provided_models_dir = os.path.expanduser(args.models_dir)
+                while True:
+                    # Check if the provided models directory exists:
+                    if os.path.isdir(provided_models_dir):
+                        break
+                    else:
+                        print(f"\n{ERROR}Models directory does not exist:{RESET} {INPUT}{provided_models_dir}{RESET}")
+                        provided_models_dir = os.path.expanduser(input(f"\n{REQUEST}Provide the new location of the models directory: {RESET}").strip())
+                models_dir = provided_models_dir
+                models_dir_updated = True
+            else:
+                models_dir = default_models_dir                            
+              
+            #print({models_dir_be_asked})                                  
+            if models_dir_be_asked:
+                models_message = (
+                    f"\n{INFO}The models directory would be mounted as /models in the container.{RESET}"
+                    f"\n{INFO}It is the directory where weight models are download and saved.{RESET}"
+                    f"\n{HINT}HINT: It can be set to an existing directory with the option '-d /your_models_directory'{RESET}"
+                )
+                print(f"{models_message}")
+
+                # Define a variable to control breaking out of both loops
+                break_inner_loop = False
+                while True:
+                    
+                    provide_models_dir = input(f"\n{REQUEST}Do you want to provide a models directory (y/N)?: {RESET}").strip().lower()
+
+                    if provide_models_dir in ["n","no", ""]:
+                        ##print(f'\n{INFO}Data directory:{RESET} {INPUT}{models_dir}{RESET}')
+                        break
+                    elif provide_models_dir in ["y","yes"]:
+                        while True:
+                            provided_models_dir = os.path.expanduser(input(f"\n{REQUEST}Provide the new location of the models directory: {RESET}").strip())  # Expand '~' to full path
+                            # Check if the provided models directory exists:
+                            if os.path.isdir(provided_models_dir):
+                                ##print(f'\n{INFO}Data directory will be:{RESET} {INPUT}{provided_models_dir}{RESET}')
+                                models_dir = provided_models_dir
+                                break_inner_loop = True
+                                break
+                            else:
+                                print(f"\n{ERROR}Provided directory does not exist:{RESET} {INPUT}{provided_models_dir}{RESET}") 
+                        if break_inner_loop:
+                            break                           
+                    else:
+                        print(f"{ERROR}\nInvalid input. Please use y(yes) or n(no).{RESET}")
+                        
+            else:
+                if not models_dir_updated:
+                    models_dir = default_models_dir  
+          
+            # Printing a setup 
+            set_up_summary = (
+                f"\n{INFO_HEADER}{'_'*50}{RESET}"   
+                f"\n{INFO_HEADER}Summary of the selected setup:{RESET}"
+                #f"\n{INFO_HEADER}{'_'*50}{RESET}" 
+                f"\nContainer name: {INPUT}{validated_container_name}{RESET}"
+                f"\n{INFO}Framework and Version:{RESET} {INPUT}{selected_framework} {selected_version}{RESET}"
+                f"\nWorkspace directory: {INPUT}{workspace_dir}{RESET}"
+                f"\nData directory: {INPUT}{data_dir}{RESET}"
+                f"\nModels directory: {INPUT}{models_dir}{RESET}"
+                #f"\nargs.workspace_dir: {args.workspace_dir}"
+                #f"\nargs.data_dir: {args.data_dir}"                
+            )
+            print(f"{set_up_summary}")
+           
+            # Confirmation of the user's inputs:
+            are_you_sure(validated_container_name, args.command)
+            
             #############################################DOCKER TASKS START######################################################################
             # Generate a unique container tag
-            container_tag = f"{validated_container_name}._.{user_id}"
+            #container_tag = f"{validated_container_name}._.{user_id}"
+            container_tag = validated_container_tag
                        
             # Check if a container with the generated tag already exists
             if container_tag == check_container_exists(container_tag):
                 print(f"\n{ERROR}Error:{RESET} \n {INPUT}[{validated_container_name}]{RESET} already exists.{RESET}")
                 show_container_info(False)
-                sys.exit(-1)
+                exit(0)
             else:
                 print(f"\n{INFO}The container will be created:{RESET} {INPUT}{validated_container_name}{RESET} ")
 
@@ -1248,6 +1361,7 @@ def main():
             container_label = "aime.mlc"
             workspace = "/workspace"
             data = "/data"
+            models = "/models"
             
             # Run the Docker Container: Starts a new container, installs necessary packages, 
             # and sets up the environment.
@@ -1266,7 +1380,7 @@ def main():
                         
             docker_prepare_container = [                
                 'docker', 'run', 
-                '-v', f'{args.workspace_dir}:{workspace}', 
+                '-v', f'{workspace_dir}:{workspace}', 
                 '-w', workspace,
                 '--name', container_tag, 
                 '--tty', 
@@ -1302,13 +1416,19 @@ def main():
             result_remove = subprocess.run(['docker', 'rm', container_tag], capture_output=True, text=True)
 
             # Create but not run the final Docker container with labels and user configurations and setting up volume mounts
-            #volumes = f'-v {args.workspace_dir}:{workspace}'
+            #volumes = f'-v {workspace_dir}:{workspace}'
 
-            volumes = ['-v', f'{args.workspace_dir}:{workspace}'] 
-            # Add the data volume mapping if args.data_dir is set
-            if args.data_dir:
-                volumes +=  ['-v', f'{args.data_dir}:{data}']
+            volumes = ['-v', f'{workspace_dir}:{workspace}'] 
             
+            # Add the data volume mapping if data_dir is set
+            if data_dir != default_data_dir:
+                volumes +=  ['-v', f'{data_dir}:{data}']
+                
+            # Add the models volume mapping if models_dir is set
+            if models_dir != default_models_dir:
+                volumes +=  ['-v', f'{models_dir}:{models}'] 
+                         
+                         
             bash_command_create_cmd = (
                 f"echo \"export PS1='[{validated_container_name}] `whoami`@`hostname`:\${{PWD#*}}$ '\" >> ~/.bashrc; bash"
             )
@@ -1322,8 +1442,9 @@ def main():
                 '--label', f'{container_label}.NAME={validated_container_name}',
                 '--label', f'{container_label}.USER={user_name}', 
                 '--label', f'{container_label}.VERSION={mlc_container_version}',
-                '--label', f'{container_label}.WORK_MOUNT={args.workspace_dir}', 
-                '--label', f'{container_label}.DATA_MOUNT={args.data_dir}',
+                '--label', f'{container_label}.WORK_MOUNT={workspace_dir}', 
+                '--label', f'{container_label}.DATA_MOUNT={data_dir}',
+                '--label', f'{container_label}.MODELS_MOUNT={models_dir}',                          # models_dir: added
                 '--label', f'{container_label}.FRAMEWORK={selected_framework}-{selected_version}', 
                 '--label', f'{container_label}.GPUS={args.num_gpus}',
                 '--user', f'{user_id}:{group_id}', 
@@ -1350,7 +1471,7 @@ def main():
             # ToDo: not use subprocess.run but subprocess.Popen
             result_create_cmd = subprocess.run(docker_create_cmd, capture_output= True, text=True)
             
-            print(f"\n{INPUT}[{validated_container_name}]{RESET} {INFO}ready. \n\nOpen the container with: mlc open{RESET} {INPUT}{validated_container_name}{RESET}\n")
+            print(f"\n{INPUT}[{validated_container_name}]{RESET} {INFO}ready. \n\nOpen the container with:\nmlc open{RESET} {INPUT}{validated_container_name}{RESET}\n")
 
         if args.command == 'export':
             
@@ -1389,19 +1510,7 @@ def main():
                     print(f'\n{INFO}Provided container name {RESET}{INPUT}[{args.container_name}]{RESET}{INFO} exists and will be opened.{RESET}')                   
             else:
                 
-                print_info_header(args.command)
-
-                """
-                print(
-                    "\n" + '_'*100 + "\n" \
-                    f"\t{INFO}Info{RESET}: \
-                    \n\tOpen an existing machine learning container.  \
-                    \n\t{INFO}Correct Usage{RESET}: \
-                    \n\tmlc open <container_name>  \
-                    \n\t{INFO}Example{RESET}: \
-                    \n\tmlc open pt231aime\n" + '_'*100
-                )
-                """              
+                print_info_header(args.command)          
 
                 # ToDo: create a function ( the same 4 lines as above)
                 print(f"\n{INFO}Available containers of the current user:{RESET}")
@@ -1444,8 +1553,8 @@ def main():
             # Now the user ends the session. How the shell session was terminated?
             if exit_code == 1:
                 print(f"\n{INPUT}[{selected_container_name}]{RESET} {INFO}detached from container, container keeps running.{RESET}")
-            else:
-                print(f"\n{INPUT}[{selected_container_name}]{RESET} {INFO}container shell closed with exit code {exit_code}.{RESET}") 
+            elif exit_code == 0:
+                print(f"\n{INPUT}[{selected_container_name}]{RESET} {INFO}container shell closed successfully (exit code {exit_code}).{RESET}") 
             
             # Check the status of the opened container     
             active_status = is_container_active(selected_container_tag)
@@ -1524,21 +1633,7 @@ def main():
                     print(f"\n{ERROR}All containers are running.\nIf you want to remove a container, stop it before using:{RESET}{HINT}\nmlc stop container_name{RESET}")
                     show_container_info(False)
                     exit(0)
-                
-
-
-                """
-                print(
-                    "\n" + '_'*100 + "\n" \
-                    f"\t{INFO}Info{RESET}: \
-                    \n\tRemove an existing and no running machine learning container.  \
-                    \n\t{INFO}Correct Usage{RESET}: \
-                    \n\tmlc remove <container_name>  [-fr | --force_remove]\
-                    \n\t{INFO}Example{RESET}: \
-                    \n\tmlc remove pt231aime [-fr | --force_remove]\n" + '_'*100
-                 )    
-                """    
-
+ 
                 # ToDo: create a function ( the same 4 lines as below)
                 print(f"\n{INFO}The following no running containers of the current user can be removed:{RESET}")
                 print_existing_container_list(no_running_containers)
@@ -1639,21 +1734,7 @@ def main():
                         f"{ERROR}\nAt the moment all containers are running.\nCreate a new one and start it using:{RESET}\n{HINT}mlc start container_name{RESET}"
                     )
                     show_container_info(False) 
-                    exit(0)
-                
-
-                
-                """   
-                print(
-                    "\n" + '_'*100 + "\n" \
-                    f"\t{INFO}Info{RESET}: \
-                    \n\tStart an existing machine learning container.  \
-                    \n\t{INFO}Correct Usage{RESET}: \
-                    \n\tmlc start <container_name>  \
-                    \n\t{INFO}Example{RESET}: \
-                    \n\tmlc start pt231aime\n" + '_'*100
-                )   
-                """                
+                    exit(0)  
 
                 # ToDo: create a function ( the same 4 lines as below)
                 print(f"\n{INFO}The following no running containers of the current user can be started:{RESET}")
@@ -1688,7 +1769,7 @@ def main():
                     print(f"\n{INPUT}[{selected_container_name}]{RESET} {ERROR}Error Starting Container.{RESET}")
             else:
                 print(f"\n{INPUT}[{selected_container_name}]{RESET} {INFO}container already running.{RESET}\n")
-                sys.exit(-1)
+                exit(0)
 
 
         if args.command == 'stats':
@@ -1762,17 +1843,6 @@ def main():
                     
                 print_info_header(args.command)
 
-                """
-                print(
-                    "\n" + '_'*100 + "\n" \
-                    f"\t{INFO}Info{RESET}: \
-                    \n\tStop an existing machine learning container.  \
-                    \n\t{INFO}Correct Usage{RESET}: \
-                    \n\tmlc stop <container_name> [-fs | --force_stop]\
-                    \n\t{INFO}Example{RESET}: \
-                    \n\tmlc stop pt231aime [-fs | --force_stop]\n" + '_'*100
-                )    
-                """
                 # ToDo: create a function ( the same 4 lines as below)
                 print(f"\n{INFO}Running containers of the current user:{RESET}")
                 print_existing_container_list(running_containers)
