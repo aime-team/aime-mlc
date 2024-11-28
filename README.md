@@ -6,7 +6,7 @@ Easily install, run and manage Docker containers for Pytorch and Tensorflow deep
 
 ## Features
 
-* Setup and run a specific version of Tensorflow or Pytorch with one simple command
+* Setup and run a specific version of Pytorch or Tensorflow with one simple command
 * Run different versions of machine learning frameworks and required libraries in parallel
 * manages required libraries (CUDA, CUDNN, CUBLAS, etc.) in containers, without compromising the host installation
 * Clear separation of user code and framework installation, test your code with a different framework version in minutes
@@ -26,7 +26,7 @@ Please read on in the [AIME MLC Installation Guide](aime-mlc-installation-guide.
 
 ### Create a machine learning container
 
-**mlc-create container_name framework version [-w=workspace\_dir] [-d=data\_dir]**
+**mlc create container_name framework version [-w=workspace\_dir] [-d=data\_dir] [-d=models\_dir] [-s|--script] [-arch|--architecture\_gpu architecture]**
 
 Create a new machine learning container
 
@@ -44,18 +44,18 @@ Available versions for NVIDIA Ada Lovelace based GPUs (RTX 4080/4090, RTX 4500/5
 Example to create a container with the name 'my-container' as Tensorflow 2.12.0 with mounted user home directory as workspace use:
 
 ```
-> mlc-create my-container Tensorflow 2.12.0 -w=/home/admin
+> mlc create my-container Tensorflow 2.12.0 -w=/home/admin
 ```
 
 
 ### Open a machine learning container
 
-**mlc-open container_name**
+**mlc open container_name**
 
 To open the created machine learning container "my-container"
 
 ```
-> mlc-open my-container
+> mlc open my-container
 ```
 
 Will output:
@@ -86,11 +86,11 @@ To exit an opened shell to the container type 'exit' on the command line. The la
 
 ### List available machine learning containers
 
-**mlc-list** will list all available containers for the current user
+**mlc list** will list all available containers for the current user
 
 
 ```
-> mlc-list
+> mlc list
 ```
 
 will output for example:
@@ -109,10 +109,10 @@ CONTAINER           FRAMEWORK                  STATUS
 
 ### List active machine learning containers
 
-**mlc-stats** show all current running ml containers and their CPU and memory usage
+**mlc stats** show all current running ml containers and their CPU and memory usage
 
 ```
-> mlc-stats
+> mlc stats
 
 Running ml-containers are:
 
@@ -123,43 +123,43 @@ CONTAINER           CPU %               MEM USAGE / LIMIT
 
 ### Start machine learning containers
 
-**mlc-start container_name** to explicitly start a container
+**mlc start container_name** to explicitly start a container
 
-mlc-start is a way to start the container to run installed background processes, like an installed web server, on the container without the need to open an interactive shell to it.
+'mlc start' is a way to start the container to run installed background processes, like an installed web server, on the container without the need to open an interactive shell to it.
 
-For opening a shell to the container just use 'mlc-open', which will automatically start the container if the container is not already running.
+For opening a shell to the container just use 'mlc open', which will automatically start the container if the container is not already running.
 
 
 ### Stop machine learning containers
 
-**mlc-stop container_name [-Y]** to explicitly stop a container.
+**mlc stop container_name [-f]** to explicitly stop a container.
 
-mlc-stop on a container is comparable to a shutdown of a computer, all activate processes and open shells to the container will be terminated.
+'mlc stop' on a container is comparable to a shutdown of a computer, all activate processes and open shells to the container will be terminated.
 
 To force a stop on a container use:
 
 ```
-mlc-stop my-container -Y
+mlc stop my-container -f
 ```
 
 ### Remove/Delete a machine learning container
 
-**mlc-remove container_name** to remove the container.
+**mlc remove container_name** to remove the container.
 
 Warning: the container will be unrecoverable deleted only data stored in the /workspace directory will be kept. Only use to clean up containers which are not needed any more.
 
 ```
-mlc-remove my-container
+mlc remove my-container
 ```
 
 ### Update ML Containers
 
-**mlc-update-sys** to update the container managment system to latest version.
+**mlc update-sys** to update the container managment system to latest version.
 
 The container system and container repo will be updated to latest version. Run this command to check if new framework versions are available. On most systems privileged access (sudo password) is required to do so.
 
 ```
-mlc-update-sys
+mlc update-sys
 ```
 
 ## Supported ML containers
