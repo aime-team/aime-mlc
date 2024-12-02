@@ -44,7 +44,7 @@ Available versions for NVIDIA Ada Lovelace based GPUs (RTX 4080/4090, RTX 4500/5
 *  Pytorch: 2.4.0, 2.3.1-aime, 2.3.0, 2.2.2, 2.2.0, 2.1.2-aime, 2.1.1-aime, 2.1.0-aime, 2.1.0, 2.0.1-aime, 2.0.1, 2.0.0, 1.14.0a-nvidia, 1.13.1-aime, 1.13.0a-nvidia, 1.12.1-aime
 
 
-Example to create a container in script mode '-s' with the name 'my-container' as Pytorch 2.4.0 with mounted user home directory as workspace, /data and /models as data and models directory, respectively:
+Example to create a container in script mode '-s' with the name 'my-container' as Pytorch 2.4.0 with mounted user home directory as workspace, /data and /models as data and models directory, respectively, use:
 
 ```
 mlc create my-container Pytorch 2.4.0 -w /home/user_name/workspace -d /home/user/data -m /home/luis/models -s -arch CUDA_AMPERE
@@ -190,23 +190,27 @@ The force option (-f) is available too.
 
 ### Tensorflow Containers
 
-| Container Name | Build  | Tensorflow Version | Ubuntu Version | Python Version | Package Manager | CUDA Version | CuDNN Version | NVIDIA driver version |
-|:----------------:|:--------:|:--------------------:|:----------------:|:----------------:|:-----------------:|:--------------:|:---------------:|:-----------------------:|
-| 2.16.1 | Official | 2.16.1 | 22.04 | 3.11.0rc1 | pip 24.0 | 12.3.107 | 8.9.6.50 | 545.23.06 |
-| 2.15.0 | Official | 2.15.0 | 22.04 | 3.11.0rc1 | pip 23.3.1 | 12.3.103 | 8.9.6.50 | 545.23.06 |
-| 2.14.0 | Official | 2.14.0 | 22.04 | 3.11.0rc1 | pip 23.2.1 | 11.8.89 | 8.6.0.163 | 525.85.12 |
-| 2.13.1-aime | AIME | 2.13.1 | 22.04 | 3.10.12 | pip 22.0.2 | 11.8.89 | 8.9.0.131 | 520.61.05 |
-| 2.13.0 | Official | 2.13.0 | 20.04 | 3.8.10 | pip 23.0.1 | 11.8.89 | 8.6.0.163 | 525.85.12 |
-| 2.12.0 | Official | 2.12.0 | 20.04 | 3.8.10 | pip 23.0.1 | 11.8.89 | 8.6.0.163 | 525.85.12 |
-| 2.11.0-nvidia  | NVIDIA | 2.11.0             | 20.04          | 3.8.10         | pip 22.3.1      | 12.0.146     | 8.7.0.84      | 525.85.12             |
-| 2.11.0-aime    | AIME   | 2.11.0             | 20.04          | 3.8.10         | pip 20.0.2      | 11.8.89      | 8.6.0.163     | 520.61.05             |
-| 2.10.1-nvidia  | NVIDIA | 2.10.1             | 20.04          | 3.8.10         | pip 22.3.1      | 11.8.89      | 8.7.0.84      | 520.61.05             |
-| 2.10.0-nvidia  | NVIDIA | 2.10.0             | 20.04          | 3.8.10         | pip 22.2.2      | 11.8.89      | 8.6.0.163     | 520.61.05             |
-| 2.9.1-nvidia   | NVIDIA | 2.9.1              | 20.04          | 3.8.10         | pip 22.2.2      | 11.8.89      | 8.6.0.163     | 520.61.03             |
+| Container Name | GPU Arch. | Build  | Tensorflow Version | Ubuntu Version | Python Version | Package Manager | CUDA Version | CuDNN Version | NVIDIA driver version |
+|:----------------:|:--------:|:--------:|:--------------------:|:----------------:|:----------------:|:-----------------:|:--------------:|:---------------:|:-----------------------:|
+| 2.16.1 | CUDA_ADA | Official | 2.16.1 | 22.04 | 3.11.0rc1 | pip 24.0 | 12.3.107 | 8.9.6.50 | 545.23.06 |
+| 2.15.0 | CUDA_ADA | Official | 2.15.0 | 22.04 | 3.11.0rc1 | pip 23.3.1 | 12.3.103 | 8.9.6.50 | 545.23.06 |
+| 2.14.0 | CUDA_ADA | Official | 2.14.0 | 22.04 | 3.11.0rc1 | pip 23.2.1 | 11.8.89 | 8.6.0.163 | 525.85.12 |
+|        | CUDA_AMPERE | Official | 2.14.0 | 22.04 | 3.11.0rc1 | pip 23.2.1 | 11.8.89 | 8.6.0.163 | 525.85.12 |
+| 2.13.1-aime | CUDA_ADA | AIME | 2.13.1 | 22.04 | 3.10.12 | pip 22.0.2 | 11.8.89 | 8.9.0.131 | 520.61.05 |
+|             | CUDA_AMPERE | AIME | 2.13.1 | 22.04 | 3.10.12 | pip 22.0.2 | 11.8.89 | 8.9.0.131 | 520.61.05 |
+| 2.13.0 | CUDA_ADA | Official | 2.13.0 | 20.04 | 3.8.10 | pip 23.0.1 | 11.8.89 | 8.6.0.163 | 525.85.12 |
+|        | CUDA_AMPERE | Official | 2.13.0 | 20.04 | 3.8.10 | pip 23.0.1 | 11.8.89 | 8.6.0.163 | 525.85.12 |
+| 2.12.0 | CUDA_ADA | Official | 2.12.0 | 20.04 | 3.8.10 | pip 23.0.1 | 11.8.89 | 8.6.0.163 | 525.85.12 |
+|        | CUDA_AMPERE | Official | 2.12.0 | 20.04 | 3.8.10 | pip 23.0.1 | 11.8.89 | 8.6.0.163 | 525.85.12 |
+| 2.11.0-nvidia  | CUDA_ADA | NVIDIA | 2.11.0             | 20.04          | 3.8.10         | pip 22.3.1      | 12.0.146     | 8.7.0.84      | 525.85.12 |
+| 2.11.0-aime    | CUDA_ADA | AIME   | 2.11.0             | 20.04          | 3.8.10         | pip 20.0.2      | 11.8.89      | 8.6.0.163     | 520.61.05 |
+| 2.10.1-nvidia  | CUDA_ADA | NVIDIA | 2.10.1             | 20.04          | 3.8.10         | pip 22.3.1      | 11.8.89      | 8.7.0.84      | 520.61.05             |
+| 2.10.0-nvidia  | CUDA_ADA | NVIDIA | 2.10.0             | 20.04          | 3.8.10         | pip 22.2.2      | 11.8.89      | 8.6.0.163     | 520.61.05             |
+| 2.9.1-nvidia   | CUDA_ADA | NVIDIA | 2.9.1              | 20.04          | 3.8.10         | pip 22.2.2      | 11.8.89      | 8.6.0.163     | 520.61.03             |
 
 ### Pytorch Containers
 
-| Container Name | GPU Arch | Build  | Pytorch  | Ubuntu Version | Python Version | Package Manager | CUDA Version | CuDNN Version | NVIDIA driver version |
+| Container Name | GPU Arch. | Build  | Pytorch  | Ubuntu Version | Python Version | Package Manager | CUDA Version | CuDNN Version | NVIDIA driver version |
 |:----------------:|:--------:|:--------:|:----------:|:----------------:|:----------------:|:-----------------:|:--------------:|:---------------:|:-----------------------:|
 | 2.4.0 | CUDA_ADA | Official | 2.4.0 | 22.04 | 3.11.9 | pip 24.0 | 12.1.105 | 9.1.0 | 530.30.02 |
 | 2.3.1-aime | CUDA_ADA | AIME | 2.3.1 | 22.04 | 3.10.12 | pip 22.0.2 | 12.1.105 | 8.9.7.29 | 530.30.02 |
