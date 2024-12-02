@@ -1,5 +1,6 @@
 # AIME ML Containers
 
+
 AIME machine learning container management system.
 
 Easily install, run and manage Docker containers for Pytorch and Tensorflow deep learning frameworks.
@@ -15,6 +16,8 @@ Easily install, run and manage Docker containers for Pytorch and Tensorflow deep
 * multi GPU: allocate GPUs per user, container or session
 * Runs with the same performance as a bare metal installation
 * Repository of all major deep learning framework versions as containers
+* (New): interactive versus script mode: the user can select everytime the best mode using only a flag
+* (New): gpu architecture is easy to be selected using either a flag or an enviroment variable
 
 ## Installation
 
@@ -26,36 +29,41 @@ Please read on in the [AIME MLC Installation Guide](aime-mlc-installation-guide.
 
 ### Create a machine learning container
 
-**mlc create container_name framework version [-w=workspace\_dir] [-d=data\_dir] [-d=models\_dir] [-s|--script] [-arch|--architecture\_gpu architecture]**
+**mlc create container_name framework version [-w workspace\_dir] [-d data\_dir] [-m models\_dir] [-s|--script] [-arch|--architecture gpu_architecture] [-g|--num_gpus all]**
 
 Create a new machine learning container
 
 Available frameworks:
 
-Tensorflow, Pytorch
+Pytorch, Tensorflow 
 
 Available versions for NVIDIA Ada Lovelace based GPUs (RTX 4080/4090, RTX 4500/5000/6000 Ada, L40, L40S):
 
-*  Tensorflow: 2.14.0, 2.13.1-aime, 2.13.0, 2.12.0, 2.11.0-nvidia, 2.11.0-aime, 2.10.1-nvidia, 2.10.0-nvidia, 2.9.1-nvidia
+*  Tensorflow: 2.16.1, 2.15.0, 2.14.0, 2.13.1-aime, 2.13.0, 2.12.0, 2.11.0-nvidia, 2.11.0-aime, 2.10.1-nvidia, 2.10.0-nvidia, 2.9.1-nvidia
 
-*  Pytorch: 2.3.1-aime, 2.3.0, 2.2.2, 2.2.0, 2.1.2-aime, 2.1.1-aime, 2.1.0-aime, 2.1.0, 2.0.1-aime, 2.0.1, 2.0.0, 1.14.0a-nvidia, 1.13.1-aime, 1.13.0a-nvidia, 1.12.1-aime
+*  Pytorch: 2.4.0, 2.3.1-aime, 2.3.0, 2.2.2, 2.2.0, 2.1.2-aime, 2.1.1-aime, 2.1.0-aime, 2.1.0, 2.0.1-aime, 2.0.1, 2.0.0, 1.14.0a-nvidia, 1.13.1-aime, 1.13.0a-nvidia, 1.12.1-aime
 
 
-Example to create a container with the name 'my-container' as Tensorflow 2.12.0 with mounted user home directory as workspace use:
+Example to create a container in script mode '-s' with the name 'my-container' as Pytorch 2.4.0 with mounted user home directory as workspace, /data and /models as data and models directory, respectively:
 
 ```
-> mlc create my-container Tensorflow 2.12.0 -w=/home/admin
+mlc create my-container Pytorch 2.4.0 -w /home/user_name/workspace -d /home/user/data -m /home/luis/models -s -arch CUDA_AMPERE
 ```
+To provide greater flexibility in selecting a GPU architecture, users can specify the desired architecture for the current container using the -arch cuda_architecture flag (default: CUDA_ADA). If a fixed architecture is preferred for an entire session, it can be set by saving the desired GPU architecture in the MLC_ARCH environment variable, for example: export MLC_ARCH=CUDA.
+
+It is important to note that the -arch flag takes precedence over the environment variable value. Similarly, if the environment variable is defined, it overrides the default architecture setting.
+
+The following architectures are currently available, listed from newest to oldest: CUDA_ADA, CUDA_AMPERE, CUDA for NVIDIA GPUs and for AMD GPUs, ROCM6 and ROCM5.
 
 
 ### Open a machine learning container
 
-**mlc open container_name**
+**mlc open container_name [-s|--script]**
 
-To open the created machine learning container "my-container"
+To open the created machine learning container "my-container" using the script mode
 
 ```
-> mlc open my-container
+mlc open my-container -s
 ```
 
 Will output:
@@ -90,7 +98,7 @@ To exit an opened shell to the container type 'exit' on the command line. The la
 
 
 ```
-> mlc list
+mlc list
 ```
 
 will output for example:
@@ -107,12 +115,19 @@ CONTAINER           FRAMEWORK                  STATUS
 [tf2-gpt2]          Tensorflow-2.0.0           Exited (137) 7 hours ago
 ```
 
-### List active machine learning containers
+In case that you wish to see all containers created by all users:
+
+```
+mlc list -a
+```
+
+
+### List the stats of active machine learning containers
 
 **mlc stats** show all current running ml containers and their CPU and memory usage
 
 ```
-> mlc stats
+mlc stats
 
 Running ml-containers are:
 
@@ -123,7 +138,7 @@ CONTAINER           CPU %               MEM USAGE / LIMIT
 
 ### Start machine learning containers
 
-**mlc start container_name** to explicitly start a container
+**mlc start container_name [-s|--script]** to explicitly start a container
 
 'mlc start' is a way to start the container to run installed background processes, like an installed web server, on the container without the need to open an interactive shell to it.
 
@@ -132,7 +147,7 @@ For opening a shell to the container just use 'mlc open', which will automatical
 
 ### Stop machine learning containers
 
-**mlc stop container_name [-f]** to explicitly stop a container.
+**mlc stop container_name [-s|--script] [-f|--force]** to explicitly stop a container.
 
 'mlc stop' on a container is comparable to a shutdown of a computer, all activate processes and open shells to the container will be terminated.
 
@@ -142,9 +157,16 @@ To force a stop on a container use:
 mlc stop my-container -f
 ```
 
+As by the other commands, the script mode is available using the flag -s:
+
+```
+mlc stop my-container -s
+```
+
+
 ### Remove/Delete a machine learning container
 
-**mlc remove container_name** to remove the container.
+**mlc remove container_name [-s|--script] [-f|--force]** to remove the container.
 
 Warning: the container will be unrecoverable deleted only data stored in the /workspace directory will be kept. Only use to clean up containers which are not needed any more.
 
@@ -162,12 +184,16 @@ The container system and container repo will be updated to latest version. Run t
 mlc update-sys
 ```
 
+The force option (-f) is available too.
+
 ## Supported ML containers
 
 ### Tensorflow Containers
 
 | Container Name | Build  | Tensorflow Version | Ubuntu Version | Python Version | Package Manager | CUDA Version | CuDNN Version | NVIDIA driver version |
 |:----------------:|:--------:|:--------------------:|:----------------:|:----------------:|:-----------------:|:--------------:|:---------------:|:-----------------------:|
+| 2.16.1 | Official | 2.16.1 | 22.04 | 3.11.0rc1 | pip 24.0 | 12.3.107 | 8.9.6.50 | 545.23.06 |
+| 2.15.0 | Official | 2.15.0 | 22.04 | 3.11.0rc1 | pip 23.3.1 | 12.3.103 | 8.9.6.50 | 545.23.06 |
 | 2.14.0 | Official | 2.14.0 | 22.04 | 3.11.0rc1 | pip 23.2.1 | 11.8.89 | 8.6.0.163 | 525.85.12 |
 | 2.13.1-aime | AIME | 2.13.1 | 22.04 | 3.10.12 | pip 22.0.2 | 11.8.89 | 8.9.0.131 | 520.61.05 |
 | 2.13.0 | Official | 2.13.0 | 20.04 | 3.8.10 | pip 23.0.1 | 11.8.89 | 8.6.0.163 | 525.85.12 |
@@ -180,23 +206,35 @@ mlc update-sys
 
 ### Pytorch Containers
 
-| Container Name | Build  | Pytorch  | Ubuntu Version | Python Version | Package Manager | CUDA Version | CuDNN Version | NVIDIA driver version |
-|:----------------:|:--------:|:----------:|:----------------:|:----------------:|:-----------------:|:--------------:|:---------------:|:-----------------------:|
-| 2.3.1-aime | AIME | 2.3.1 | 22.04 | 3.10.12 | pip 22.0.2 | 12.1.105 | 8.9.7.29 | 530.30.02 |
-| 2.3.0 | Official | 2.3.0 | 22.04 | 3.10.14 | conda 23.5.2 | 12.1.105 | 8.9.7.29 | 530.30.02 |
-| 2.2.2 | AIME | 2.2.2 | 22.04 | 3.10.12 | pip 22.0.2 | 12.1.105 | 8.9.7.29 | 530.30.02 |
-| 2.2.0 | Official | 2.2.0 | 22.04 | 3.10.13 | conda 23.9.0 | 12.1.105 | 8.9.0.131 | 530.30.02 | 
-| 2.1.2-aime | AIME | 2.1.2 | 22.04 | 3.10.12 | pip 22.0.2 | 12.1.105 | 8.9.0.131 | 530.30.02 |
-| 2.1.1-aime | AIME | 2.1.1 | 22.04 | 3.10.12 | pip 22.0.2 | 12.1.105 | 8.9.0.131 | 530.30.02 |
-| 2.1.0-aime | AIME | 2.1.0 | 22.04 | 3.10.12 | pip 22.0.2 | 11.8.89 | 8.9.0.131 | 520.61.05 |
-| 2.1.0 | Official | 2.1.0 | 22.04 | 3.10.13 | conda 23.9.0 | 12.1.105 | 8.9.0.131 | 530.30.02 |
-| 2.0.1-aime | AIME | 2.0.1 | 22.04 | 3.10.12 | pip 22.0.2 | 11.8.89 | 8.9.0.131 | 520.61.05 |
-| 2.0.1 | Official | 2.0.1 | 20.04          | 3.8.10         | pip 20.0.2      | 11.8.89      | 8.9.0.131     | 520.61.05             |
-| 2.0.0 | Official | 2.0.0 | 20.04          | 3.8.10         | pip 20.0.2      | 11.8.89      | 8.6.0.163     | 520.61.05             |
-| 1.14.0a-nvidia | NVIDIA   | 1.14.0a0          | 20.04          | 3.8.10         | pip 21.2.4      | 12.0.146     | 8.7.0.84      | 525.85.11             |
-| 1.13.1-aime    | AIME     | 1.13.1            | 20.04          | 3.8.10         | pip 20.0.2      | 11.8.89      | 8.6.0.163     | 520.61.05             |
-| 1.13.0a-nvidia | NVIDIA   | 1.13.0a0          | 20.04          | 3.8.13         | pip 21.2.4      | 11.8.89      | 8.6.0.163     | 520.61.03             |
-| 1.12.1-aime    | AIME     | 1.12.1            | 20.04          | 3.8.10         | pip 20.0.2      | 11.8.89      | 8.6.0.163     | 520.61.05             |
+| Container Name | GPU Arch | Build  | Pytorch  | Ubuntu Version | Python Version | Package Manager | CUDA Version | CuDNN Version | NVIDIA driver version |
+|:----------------:|:--------:|:--------:|:----------:|:----------------:|:----------------:|:-----------------:|:--------------:|:---------------:|:-----------------------:|
+| 2.4.0 | CUDA_ADA | Official | 2.4.0 | 22.04 | 3.11.9 | pip 24.0 | 12.1.105 | 9.1.0 | 530.30.02 |
+| 2.3.1-aime | CUDA_ADA | AIME | 2.3.1 | 22.04 | 3.10.12 | pip 22.0.2 | 12.1.105 | 8.9.7.29 | 530.30.02 |
+|       | CUDA_AMPERE |       |       |       |        |          |          |       |           |
+| 2.3.0 | CUDA_ADA | Official | 2.3.0 | 22.04 | 3.10.14 | conda 23.5.2 | 12.1.105 | 8.9.7.29 | 530.30.02 |
+|       | CUDA_AMPERE |       |       |       |        |          |          |       |           |
+| 2.2.2 | CUDA_ADA | AIME | 2.2.2 | 22.04 | 3.10.12 | pip 22.0.2 | 12.1.105 | 8.9.7.29 | 530.30.02 |
+| 2.2.0 | CUDA_ADA | Official | 2.2.0 | 22.04 | 3.10.13 | conda 23.9.0 | 12.1.105 | 8.9.0.131 | 530.30.02 |
+|       | CUDA_AMPERE |       |       |       |        |          |          |       |           |
+| 2.1.2-aime | CUDA_ADA | AIME | 2.1.2 | 22.04 | 3.10.12 | pip 22.0.2 | 12.1.105 | 8.9.0.131 | 530.30.02 |
+|       | CUDA_AMPERE |       |       |       |        |          |          |       |           |
+| 2.1.1-aime | CUDA_ADA | AIME | 2.1.1 | 22.04 | 3.10.12 | pip 22.0.2 | 12.1.105 | 8.9.0.131 | 530.30.02 |
+|       | CUDA_AMPERE |       |       |       |        |          |          |       |           |
+| 2.1.0-aime | CUDA_ADA | AIME | 2.1.0 | 22.04 | 3.10.12 | pip 22.0.2 | 11.8.89 | 8.9.0.131 | 520.61.05 |
+|       | CUDA_AMPERE | AIME | 2.1.0 | 22.04 | 3.10.12 | pip 22.0.2 | 11.8.89 | 8.9.0.131 | 520.61.05 |
+| 2.1.0 | CUDA_ADA | Official | 2.1.0 | 22.04 | 3.10.13 | conda 23.9.0 | 12.1.105 | 8.9.0.131 | 530.30.02 |
+|       | CUDA_AMPERE |       |       |       |        |          |          |       |           |
+| 2.0.1-aime | CUDA_ADA | AIME | 2.0.1 | 22.04 | 3.10.12 | pip 22.0.2 | 11.8.89 | 8.9.0.131 | 520.61.05 |
+|       | CUDA_AMPERE | AIME | 2.0.1 | 22.04 | 3.10.12 | pip 22.0.2 | 11.8.89 | 8.9.0.131 | 520.61.05 |
+| 2.0.1 | CUDA_ADA | Official | 2.0.1 | 20.04          | 3.8.10         | pip 20.0.2      | 11.8.89      | 8.9.0.131     | 520.61.05             |
+|       | CUDA_AMPERE | Official | 2.0.1 | 20.04          | 3.8.10         | pip 20.0.2      | 11.8.89      | 8.9.0.131     | 520.61.05             |
+| 2.0.0 | CUDA_ADA | Official | 2.0.0 | 20.04          | 3.8.10         | pip 20.0.2      | 11.8.89      | 8.6.0.163     | 520.61.05             |
+|       | CUDA_AMPERE | Official | 2.0.0 | 20.04          | 3.8.10         | pip 20.0.2      | 11.8.89      | 8.6.0.163     | 520.61.05             |
+| 1.14.0a-nvidia | CUDA_ADA | NVIDIA   | 1.14.0a0          | 20.04          | 3.8.10         | pip 21.2.4      | 12.0.146     | 8.7.0.84      | 525.85.11             
+| 1.13.1-aime    | CUDA_ADA | AIME     | 1.13.1            | 20.04          | 3.8.10         | pip 20.0.2      | 11.8.89      | 8.6.0.163     | 520.61.05             
+| 1.13.0a-nvidia | CUDA_ADA | NVIDIA   | 1.13.0a0          | 20.04          | 3.8.13         | pip 21.2.4      | 11.8.89      | 8.6.0.163     | 520.61.03             
+| 1.12.1-aime    | CUDA_ADA | AIME     | 1.12.1            | 20.04          | 3.8.10         | pip 20.0.2      | 11.8.89      | 8.6.0.163     | 520.61.05             
+
 
 
 

@@ -160,7 +160,7 @@ def get_flags():
         'open', 
         description= "Open an existing and no running container.",
         help="Open an existing and no running container.", 
-        usage = f"\n{INPUT}mlc open container_name{RESET}",
+        usage = f"\n{INPUT}mlc open container_name -s{RESET}",
         formatter_class = argparse.RawTextHelpFormatter
     )
     parser_open.add_argument(
@@ -270,7 +270,6 @@ def get_flags():
     args = parser.parse_args()
          
     return args, available_commands
-
 
 
 ################################################################################################################################################
@@ -1277,7 +1276,7 @@ def main():
                         break
                     else:
                         if args.script:
-                            print(f"\n{ERROR}Models directory does not exist:{RESET} {INPUT}{provided_models_dir}{RESET}")
+                            print(f"\n{ERROR}Models directory does not exist:{RESET} {INPUT}{provided_models_dir}{RESET}\n")
                             exit(0)
                         print(f"\n{ERROR}Models directory does not exist:{RESET} {INPUT}{provided_models_dir}{RESET}")
                         provided_models_dir = os.path.expanduser(input(f"\n{REQUEST}Provide the new location of the models directory: {RESET}").strip())

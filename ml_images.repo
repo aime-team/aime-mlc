@@ -17,12 +17,10 @@ Pytorch, 2.1.0-aime, [CUDA_ADA;CUDA_AMPERE], aimehub/pytorch-2.1.0-aime-cuda11.8
 Pytorch, 2.1.0, [CUDA_AMPERE], aimehub/pytorch-2.1.0-cuda11.8
 Pytorch, 2.1.0, [CUDA_ADA], aimehub/pytorch-2.1.0-cuda12.1
 Pytorch, 2.0.1-aime, [CUDA_ADA;CUDA_AMPERE], aimehub/pytorch-2.0.1-aime-cuda11.8
-Pytorch, 2.0.1, [CUDA_AMPERE], aimehub/pytorch-2.0.1-cuda11.7
-Pytorch, 2.0.1, [CUDA_ADA], aimehub/pytorch-2.0.1-cuda11.8
+Pytorch, 2.0.1, [CUDA_ADA;CUDA_AMPERE], aimehub/pytorch-2.0.1-cuda11.8
 Pytorch, 2.0.1, [ROCM5], aimehub/pytorch-2.0.1-rocm5.7
 Pytorch, 2.0.1, [ROCM6], aimehub/pytorch-2.0.1-rocm6.0
-Pytorch, 2.0.0, [CUDA_AMPERE], aimehub/pytorch-2.0.0-cuda11.7
-Pytorch, 2.0.0, [CUDA_ADA], aimehub/pytorch-2.0.0-cuda11.8
+Pytorch, 2.0.0, [CUDA_ADA;CUDA_AMPERE], aimehub/pytorch-2.0.0-cuda11.8
 Pytorch, 2.0.0, [ROCM5], aimehub/pytorch-2.0.0-rocm5.4
 Pytorch, 1.14.0a-nvidia, [CUDA_ADA], aimehub/pytorch-1.14.0a-nvidia-cuda12.0
 Pytorch, 1.13.1-aime, [CUDA_ADA], aimehub/pytorch-1.13.1-aime-cuda11.8

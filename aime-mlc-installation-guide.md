@@ -473,23 +473,27 @@ git clone --branch stable-cuda-ada https://github.com/aime-team/aime-ml-containe
 ```
 
 
-AIME provides different branches for the AIME MLCs depending on the model of the GPU, NVIDIA or AMD, and the generation:
+AIME offers solutions for the AIME MLCs depending on the model of the GPU, NVIDIA or AMD, and the generation:
 
 
-- stable-cuda-ada: used for the current NVIDIA GPU generation "Ada Lovelace and Hopper" like RTX 4090, RTX 5000/ 6000 ada, H100 it is currently backward compatible with Ampere based GPUs, but does not provide earlier version only available for the Ampere generation
+- CUDA_ADA: used for the current NVIDIA GPU generation "Ada Lovelace and Hopper" like RTX 4090, RTX 5000/ 6000 ada, H100 it is currently backward compatible with Ampere based GPUs, but does not provide earlier version only available for the Ampere generation
 
 
-- stable-cuda-ampere: for the NVIDIA Ampere generation, like RTX 3090, RTX A5000/A6000, A100
+- CUDA_AMPERE: for the NVIDIA Ampere generation, like RTX 3090, RTX A5000/A6000, A100
 
 
-- stable-cuda: for the NVIDIA Turing GPU generation, like RTX 2080TI, RTX Titan, Quadro RTX
+- CUDA: for the NVIDIA Turing GPU generation, like RTX 2080TI, RTX Titan, Quadro RTX
 
 
-- stable-rocm6: for AMD ROCM 6.0 supported GPUs
+- ROCM6: for AMD ROCM 6.0 supported GPUs
 
 
-- stable-rocm5: for AMD ROCM 5.0 supported GPUs
+- ROCM5: for AMD ROCM 5.0 supported GPUs
 
+
+Users can specify the desired architecture for the current container using the -arch cuda_architecture flag (default: CUDA_ADA). If a fixed architecture is preferred for an entire session, it can be set by saving the desired GPU architecture in the MLC_ARCH environment variable, for example: export MLC_ARCH=CUDA.
+
+It is important to note that the -arch flag takes precedence over the environment variable value. Similarly, if the environment variable is defined, it overrides the default architecture setting.
 
 The next step is to add in /home/user/.bashrc the path where aime-ml-containers was cloned to, in the above example /home/$USER/aime-ml-containers, adding the following at the end of .bashrc:
 
@@ -518,7 +522,7 @@ and source it using:
 
 
     ```
-    mlc-update-sys
+    mlc update-sys
     ```
 
     Your should see something similar to:
@@ -535,7 +539,7 @@ and source it using:
     The AIME MLCs were not correctly installed if you see:
 
 ```
-    mlc-update-sys: Command not found
+    mlc update-sys: Command not found
 ```
 
 
@@ -556,7 +560,7 @@ More information about how to work with AIME MLCs, [here](https://www.aime.info/
 In case you want to uninstall AIME MLC, juste remove the path from the .bashrc file and delete the folder where you cloned the aime-ml-containers files, in this example, /home/$USER/aime-ml-containers.
 
 
-Before that, we would recommend to remove all previous created MLCs by using mlc-remove container_name.
+Before that, we would recommend to remove all previous created MLCs by using mlc remove container_name.
 
 
 After that, to reclaim the disk space allocated by Docker and release the cached downloaded docker container images with:
