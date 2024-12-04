@@ -77,17 +77,11 @@ def get_flags():
         'create',
         description= "Create a new container.",
         help='Create a new container.',
-        usage = f"\n{INPUT}mlc create <container_name> <framework_name> <framework_version>"
+        usage = f"\n{INPUT}mlc create <framework_name> <framework_version> <container_name>"
                 f"\n    -w <workspace_directory> -d <data_directory> -m <models_directory>"
                 f"\n    -s -arch <gpu_architecture> -ng <number of gpus> {RESET}", 
         formatter_class = argparse.RawTextHelpFormatter
-    )
-    parser_create.add_argument(
-        'container_name', 
-        nargs='?', 
-        type=str, 
-        help='Name of the container.'
-    )    
+    ) 
     parser_create.add_argument(
         'framework', 
         nargs='?', 
@@ -101,14 +95,20 @@ def get_flags():
         help='Version of the framework.'
     )
     parser_create.add_argument(
+        'container_name', 
+        nargs='?', 
+        type=str, 
+        help='Name of the container.'
+    ) 
+    parser_create.add_argument(
         '-arch', '--architecture', 
         type=str,
         metavar='', 
         help=f"Set the gpu architecture to be used. Default: CUDA_ADA."
              f"\nThere are 2 options to change the default value:"
-             f"\n  1.-using the -arch flag"  
+             f"\n  1.-using the -arch flag."  
              f"\n  2.-adding the environment variable MLC_ARCH, with export MLC_ARCH=gpu_arch."
-             f"\nThe flag -arch overrides MLC_ARCH and MLC_ARCH overrides the default value"
+             f"\nThe flag -arch overrides MLC_ARCH and MLC_ARCH overrides the default value."
     )
     parser_create.add_argument(
         '-d', '--data_dir', 
@@ -122,6 +122,11 @@ def get_flags():
         default='all',
         metavar='', 
         help='Number of GPUs to be used. Default: all.'
+    )
+    parser_create.add_argument(
+        '-i', '--info', 
+        action='store_true',
+        help='Show the available AI frameworks and versions (default: off).'
     )
     parser_create.add_argument(
         '-m', '--models_dir', 
@@ -276,12 +281,13 @@ def get_flags():
 
 
 def are_you_sure(selected_container_name, command, script = False):
-    """_summary_
+    """Ask the user for a confirmation before an action is started.
 
     Args:
-        selected_container_name (_type_): _description_
-        command (_type_): _description_
-    """
+        selected_container_name (str): name of the container.
+        command (str): type of the command (create, open, remove,...). The command is used only for printing a message.
+        script (bool, optional): script mode is provided. Defaults to False.
+    """   
     
     if not script:        
         if command == "create":            
@@ -307,44 +313,43 @@ def are_you_sure(selected_container_name, command, script = False):
                 print(f"{ERROR}\nInvalid input. Please use y(yes) or n(no).{RESET}") 
                 
 
-# ToDo: subtitute this function using run_docker_command
+# ToDo: improve this function using run_docker_command
 def check_container_exists(name):
-    """_summary_
+    """Check if a container with the provided tag already exists.
 
     Args:
-        name (_type_): _description_
+        name (str): name of the container tag.
 
     Returns:
-        _type_: _description_
+        str: name of the container .
     """
     
     result = subprocess.run(['docker', 'container', 'ps', '-a', '--filter', f'name={name}', '--filter', 'label=aime.mlc', '--format', '{{.Names}}'], capture_output=True, text=True)
     return result.stdout.strip()
 
 
-def check_container_running(container_name):
-    """
-    Check if the container is running.
-    
+def check_container_running(container_tag):
+    """Check if the container with the provided container tag is running.
+
     Args:
+        container_tag (str): provided container tag.
+
+    Returns:
+        str: name of the container tag associated to the provided container tag.
+    """   
     
-    Return:
-    
-    """
-    docker_command = f'docker container ps --filter=name=^/{container_name}$ --filter=label=aime.mlc --format "{{{{.Names}}}}"'
+    docker_command = f'docker container ps --filter=name=^/{container_tag}$ --filter=label=aime.mlc --format "{{{{.Names}}}}"'
     output, _, _ = run_docker_command(docker_command)
     return output
        
 
 def display_gpu_architectures(architectures):
-    """_summary_
+    """Display the available gpu architectures located in the file ml_images.repo.
 
     Args:
-        architectures (list): _description_
-
-    Returns:
-        : 
-    """  
+        architectures (list): available gpu architectures.
+    """
+    
     print(f"\n{INFO}Available gpu architectures:{RESET}")
 
     for i, architecture in enumerate(architectures, start=1):
@@ -352,14 +357,15 @@ def display_gpu_architectures(architectures):
     
     
 def display_frameworks(frameworks_dict):
-    """_summary_
+    """Display the available AI frameworks.
 
     Args:
-        frameworks_dict (_type_): _description_
+        frameworks_dict (dict): dictionary whose keys are the available frameworks.
 
     Returns:
-        _type_: _description_
-    """  
+        list: return a list with the available frameworks.
+    """ 
+     
     print(f"\n{REQUEST}Select a framework:{RESET}")
     framework_list = list(frameworks_dict.keys())
 
@@ -369,22 +375,23 @@ def display_frameworks(frameworks_dict):
 
 
 def display_versions(framework, versions):
-    """_summary_
+    """Display the corresponding versions to a provided framework.
 
     Args:
-        framework (_type_): _description_
-        versions (_type_): _description_
+        framework (str): predefined framework.
+        versions (tuple): tuple containing (version(str), image(str)).
     """    
+    
     print(f"\n{INFO}Available versions for {framework}:{RESET}")
     for i, (version, _) in enumerate(versions, start=1):
         print(f"{i}) {version}")
 
 
-def extract_from_ml_images(filename, filter_architecture=None):
+def extract_from_ml_images(filename, filter_architecture=DEFAULT_ARCH):
     """Extract the information from the file corresponding to the supported frameworks, versions, cuda architectures and docker images.
 
     Args:
-        filename (str): name of the file where the framework, version, cuda archicture and docker image name are provided 
+        filename (str): name of the file where the framework, version, cuda archicture and docker image name are provided.
         filter_architecture (str, optional): the cuda architecture, for example, "CUDA_ADA". Defaults to None.
 
     Returns:
@@ -417,14 +424,13 @@ def extract_from_ml_images(filename, filter_architecture=None):
 
 
 def existing_user_containers(user_name, mlc_command):
-    """Provide a list of existing containers created previously by the current user
+    """Provide 2 lists of existing containers and corresponding container tags created previously by the current user.
 
     Args:
-        user_name (_type_): _description_
-        mlc_command (_type_): _description_
-
+        user_name (str): current user name.
+        mlc_command (str): current mlc command.
     Returns:
-        _type_: _description_
+        list, list: returns 2 lists with existing containers and corresponding container tags.
     """    
  
     # List all containers with the 'aime.mlc' label owned by the current user
@@ -444,39 +450,38 @@ def existing_user_containers(user_name, mlc_command):
 
 
 def format_container_stats(container_stats_dict):
-    """format the container info
+    """Format the container info provided by the stats.
 
     Args:
-        container_stats_dict (_type_): _description_
+        container_stats_dict (dict): dictionay containing the whole stats of a container.
 
     Returns:
-        _type_: _description_
-    """    
+        list: stats line representing the columns of the output.
+    """  
+
+    #ToDo: check if labels_string is needed  
     # Extract the 'Labels' field
-    labels_string = container_stats_dict.get('Labels', {})
+    #labels_string = container_stats_dict.get('Labels', {})
     # Retrieve the value for 'aime.mlc.USER'
     container_name = container_stats_dict["Name"].split('._.')[0]
     cpu_usage_perc = container_stats_dict["CPUPerc"]
     memory_usage = container_stats_dict["MemUsage"]
     memory_usage_perc = container_stats_dict["MemPerc"]
     processes_active = container_stats_dict["PIDs"]
-    stats_to_be_printed = [f"[{container_name}]", cpu_usage_perc, memory_usage, memory_usage_perc, processes_active]
+    stats_line_to_be_printed = [f"[{container_name}]", cpu_usage_perc, memory_usage, memory_usage_perc, processes_active]
 
-    # Format the output line
-    return stats_to_be_printed #"_".join(info_to_be_printed)
+    return stats_line_to_be_printed
 
 
 def filter_by_state(state, running_containers, *lists):
-    """
-    Filters multiple lists based on the provided state (True/False).
+    """Filters multiple lists based on the provided state (True/False).
 
     Args:
-        state (bool): The state to filter by (True for running, False for not running).
+        state (bool): the state to filter by (True for running, False for not running).
         running_containers (list): A list of boolean values indicating running status.
-        *lists: Variable number of lists to filter based on the running_containers.
-
+        *lists: variable number of lists to filter based on the running_containers.
     Returns:
-        list: A list of filtered lists.
+        list: a list of filtered lists.
     """
     
     return [
@@ -486,16 +491,14 @@ def filter_by_state(state, running_containers, *lists):
 
 
 def filter_running_containers(running_containers, *lists):
-    """
-    Filters multiple lists (e.g., running_containers and running_container_tags) 
+    """Filters multiple lists (e.g., running_containers and running_container_tags) 
     based on the running_containers_state list, using filter_by_state.
 
     Args:
-        running_containers (list): A list of boolean values indicating running status.
-        *lists: Variable number of lists to filter based on running_containers.
-
+        running_containers (list): a list of boolean values indicating running status.
+        *lists: variable number of lists to filter based on running_containers.
     Returns:
-        tuple: A flattened tuple of no_running and running filtered lists and lengths of the lists.
+        tuple: a flattened tuple of no_running and running filtered lists and lengths of the lists.
     """
     
     no_running_results = filter_by_state(False, running_containers, *lists) 
@@ -510,18 +513,17 @@ def filter_running_containers(running_containers, *lists):
 
 
 def format_container_info(container_info_dict):
-    """Format the container info
+    """Format the container info.
 
     Args:
-        container_info_dict (_type_): _description_
+        container_info_dict (dict): dict containing the whole info from the "docker container ls" command.
 
     Returns:
-        _type_: _description_
+        list: lines containing the info for printing.
     """
     
     # Extract the 'Labels' field
     labels_string = container_info_dict.get('Labels', {})
-    
     # Split the labels string into key-value pairs
     labels_dict = dict(pair.split('=', 1) for pair in labels_string.split(','))
     
@@ -544,7 +546,7 @@ def get_gpu_architectures(filename):
     """Get current gpu architectures from repo file.
 
     Args:
-        filename (str): name of the file where the framework, version, gpu architecture and docker image name are provided 
+        filename (str): name of the file where the framework, version, gpu architecture and docker image name are provided.
 
     Returns:
         list: provides a list of the available gpu architectures.
@@ -571,14 +573,14 @@ def get_gpu_architectures(filename):
 
 
 def get_user_selection(prompt, max_value):
-    """_summary_
+    """The user provides a position in the list corresponding to a desire.
 
     Args:
-        prompt (_type_): _description_
-        max_value (_type_): _description_
+        prompt (str): prompt with the request.
+        max_value (int): maximal value of the list corresponding to the available options.
 
     Returns:
-        _type_: _description_
+        int: positive integer of the selected position.
     """   
         
     while True:
@@ -593,10 +595,12 @@ def get_user_selection(prompt, max_value):
         
 
 def get_container_image(container_tag):
-    """Get the image of the container using the container tag.
+    """Get the image of the container corresponding to a provided container tag.  
 
     Args:
-        container_tag (_type_): _description_
+        container_tag (str): container tag.
+    Returns:
+        str: image corresponding to a provided container tag.
     """    
     
    # Get the image associated with the container
@@ -614,16 +618,18 @@ def get_container_image(container_tag):
 
 
 def get_container_name(container_name, user_name, command, script=False):
-    """_summary_
+    """Get and check whether a container name is provided, and in this case, check that the container name contains valid characters. 
 
     Args:
-        container_name (_type_): _description_
-        user_name (_type_): _description_
-        command (_type_): _description_
+        container_name (str): name of the container.
+        user_name (str): name of the user.
+        command (str): mlc command used.
+        script (bool, optional): script mode on=True or off=False. Defaults to False.
 
     Returns:
-        _type_: _description_
-    """
+        str: returns a validated container name
+    """    
+
     # ToDo: customize i/o usign user_name. 
 
     if container_name:                
@@ -647,19 +653,19 @@ def get_container_name(container_name, user_name, command, script=False):
 
 
 def get_docker_image(version, images):
-    """_summary_
+    """Get the docker image corresponding to the provided version.
 
     Args:
-        version (_type_): _description_
-        images (_type_): _description_
+        version (str): selected version. Example: 2.4.0.
+        images (list of tuples): list containing tuples, which contains version and the docker image location. Example: [('2.4.0', 'aimehub/pytorch-2.4.0-cuda12.1'),...].
 
     Raises:
-        ValueError: _description_
+        ValueError: if the user provides an unavailable version.
 
     Returns:
-        _type_: _description_
+        str: _description_
     """
-    
+
     for tup in images:
         if tup[0] == version:
             return tup[1]
@@ -672,7 +678,10 @@ def is_container_active(container_name):
     """Check if the container is active by inspecting its processes.
 
     Args:
-        container_name (_type_): _description_
+        container_name (str): name of the container.
+
+    Returns:
+        boolean: True, if the container is active (number of processes is higher as 2 with a successfull exit code of the docker command).
     """    
 
     docker_command = f'docker top {container_name} -o pid'
@@ -685,10 +694,10 @@ def is_container_active(container_name):
 
 
 def print_existing_container_list(container_list):
-    """Print an ordered list with the existing containers
+    """Print an ordered list with the existing containers.
 
     Args:
-        container_list (_type_): _description_
+        container_list (list): a list containing the available containers.
     """    
     
     for index, container in enumerate(container_list, start=1):
@@ -696,11 +705,11 @@ def print_existing_container_list(container_list):
 
 
 def print_info_header(command):
-    """
+    """Print an info header depending on the used mlc command.
 
     Args:
-        command (_type_): _description_
-    """       
+        command (str): mlc command used by the user.
+    """ 
     
     if command == "create":
         print(
@@ -708,9 +717,9 @@ def print_info_header(command):
             f"    {INFO_HEADER}Info{RESET}: \
             \n    Create a new container \
             \n\n    {INFO_HEADER}How to use{RESET}: \
-            \n    mlc create <container_name> <framework_name> <framework_version> -w <workspace_directory> -d <data_directory> -m <models_directory> -s -arch <gpu_architecture> -ng <number of gpus> \
+            \n    mlc create <framework_name> <framework_version> <container_name> -w <workspace_directory> -d <data_directory> -m <models_directory> -s -arch <gpu_architecture> -ng <number of gpus> \
             \n\n    {INFO_HEADER}Example{RESET}: \
-            \n    mlc create pt231aime Pytorch 2.3.1-aime -w /home/$USER/workspace -d /data -m /home/$USER/models -s -ng 1\n" 
+            \n    mlc create Pytorch 2.3.1-aime pt231aime -w /home/$USER/workspace -d /data -m /home/$USER/models -s -ng 1\n" 
         ) 
                 
     if command == "open":
@@ -770,13 +779,13 @@ def print_info_header(command):
 
 
 def run_docker_command(docker_command):
-    """Run a shell command and return its output.
+    """Run a shell command and return its output usign subprocess.run().
 
     Args:
-        docker_command (_type_): _description_
+        docker_command (str): docker command to be executed.
 
     Returns:
-        _type_: _description_
+        str, str, int: standard output and error file handle and returncode.
     """    
  
     result = subprocess.run(
@@ -789,13 +798,13 @@ def run_docker_command(docker_command):
 
 
 def run_docker_command_popen(command):
-    """_summary_
+    """Run a shell command and return its output using subprocess.Popen().
 
     Args:
-        command (_type_): _description_
+        command (str): docker command to be executed.
 
     Returns:
-        _type_: _description_
+        str, int: standard error file handle and returncode.
     """    
     process = subprocess.Popen(
         command, 
@@ -808,13 +817,13 @@ def run_docker_command_popen(command):
 
 
 def set_framework(framework_version_docker_sorted):
-    """_summary_
+    """Display the available frameworks and set the framework by interactive selection.
 
     Args:
-        framework_version_docker_sorted (_type_): _description_
+        framework_version_docker_sorted (dict): the content is a dict providing the availables frameworks, versions, gpu architecture and docker images.
 
     Returns:
-        _type_: _description_
+        str: selected framework.
     """ 
     
     framework_list = display_frameworks(framework_version_docker_sorted)
@@ -823,17 +832,19 @@ def set_framework(framework_version_docker_sorted):
     return framework_list[framework_num - 1]
     
     
-def set_version(framework, images):
-    """_summary_
+def set_version(framework, version_images):
+    """Display the available versions of the preselected framework and set a framework version.
 
     Args:
-        framework (_type_): _description_
-        images (_type_): _description_
-    """
+        framework (str): name of the preselected framework.
+        version_images (list): list including tuples with the format (version, image).
+    Returns:
+        tuple(str, str): returns the version and the corresponding docker image. 
+    """    
                     
-    display_versions(framework, images)
-    version_number = get_user_selection(f"{REQUEST}Enter the number of your version: {RESET}", len(images))
-    return images[version_number - 1]
+    display_versions(framework, version_images)
+    version_number = get_user_selection(f"{REQUEST}Enter the number of your version: {RESET}", len(version_images))
+    return version_images[version_number - 1]
 
 
 # ToDo: try to combine select_container() with get_user_selection(prompt, max_value).
@@ -841,10 +852,10 @@ def select_container(container_list):
     """Prompts the user to select a container from the list.
 
     Args:
-        container_list (_type_): _description_
+        container_list (list): a list of containers (running, no running)
 
     Returns:
-        _type_: _description_
+        str, int: selected container, position in the list
     """    
 
     while True:
@@ -860,13 +871,16 @@ def select_container(container_list):
 
 
 def select_container_to_be_ed(containers):
-    """_summary_
-
+    """Print a list of existing containers and provide a selected container name and its position in a list.
+    
+    Options: 
+    select_container_to_be_opened/removed/start/stopped
+    
     Args:
-        available_user_containers (_type_): _description_
+        containers (list): list of container which can be opened/removed/start/stopped
 
     Returns:
-        _type_: _description_
+        str, int: selected container, position in the list
     """
 
     print_existing_container_list(containers)
@@ -899,19 +913,18 @@ def show_container_stats():
         process.terminate()
         print(f"\n{ERROR}There are only no running containers. Start or open a container to show the stats.{RESET}\n")
         exit(0)
-        
-    # Print the final processed output
-    # Define an output format string with specified widths
-    format_string = "{:<30}{:<10}{:<25}{:<10}{:<15}"
-    print(f"\n{INFO}Current stats of the running containers:{RESET}")
-    titles = ["CONTAINER", "CPU %", "MEM USAGE / LIMIT", "MEM %", "PROCESSES (PIDs)"]
-            
-    if stdout_data:        
+    else:        
+        # Print the final processed output
+        # Define an output format string with specified widths
+        format_string = "{:<30}{:<10}{:<25}{:<10}{:<15}"
+        print(f"\n{INFO}Current stats of the running containers:{RESET}")
+        titles = ["CONTAINER", "CPU %", "MEM USAGE / LIMIT", "MEM %", "PROCESSES (PIDs)"]
+                  
         # Split into individual lines and process them as JSON objects
         output_lines = []
         
         # Split by newlines and parse each line as JSON
-        json_lines = stdout_data.split('\n') #list
+        json_lines = stdout_data.split('\n')
         containers_stats = [json.loads(line) for line in json_lines if line]
 
         # Apply formatting to all containers' info
@@ -923,15 +936,15 @@ def show_container_stats():
     process.terminate()        
 
 
-def show_container_info(args_all):
-    """_summary_
+def show_container_info(flag):
+    """Print container info
 
     Args:
-        args_all (_type_): _description_
+        flag (str): flag argument provided by the user
     """
     
     # Adapt the filter to the selected flags (no flag or --all)
-    filter_aime_mlc_user =  "label=aime.mlc" if args_all else f"label=aime.mlc={user_name}"
+    filter_aime_mlc_user =  "label=aime.mlc" if flag else f"label=aime.mlc={user_name}"
     docker_command_ls = [
         "docker", "container", 
         "ls", 
@@ -952,7 +965,6 @@ def show_container_info(args_all):
     # Communicate with the process to get output and errors
     stdout_data, stderr_data = process.communicate()        
     stdout_data = str(stdout_data.strip())
-
 
     # Check for any errors
     if process.returncode != 0:
@@ -983,7 +995,7 @@ def show_container_info(args_all):
     # Show only container_name, framework and status
     format_string = "{:<30}{:<30}{:<30}"
 
-    print(f"\n{INFO}Current status of the containers:{RESET}")
+    print(f"\n{INFO}List of available containers:{RESET}")
     #titles = ["CONTAINER", "SIZE", "USER", "FRAMEWORK", "STATUS"]
     # Show only container_name, framework and status
     titles = ["CONTAINER", "FRAMEWORK", "STATUS"]
@@ -991,27 +1003,46 @@ def show_container_info(args_all):
     print(format_string.format(*titles))
     print("\n".join(format_string.format(*info) for info in output_lines)+"\n")
 
-
-def validate_container_name(container_name, command, script):
-    """_summary_
+def show_frameworks_versions(architecture, ml_images_content):
+    """Print the available frameworks and versions by mlc create
 
     Args:
-        container_name (_type_): _description_
+        architecture (str): current gpu architecture
+        ml_images_content (dict): dict containing as keys the frameworks and as values tuples (version, docker image)
+    """    
+
+    frameworks = list(ml_images_content.keys())
+    print(f"{INFO}\nAvailable frameworks and versions (gpu architecture: {INPUT}{architecture}{RESET}{INFO}):{RESET}")
+    for framework in frameworks:
+        version_images = ml_images_content[framework]
+        print(f"{framework}: {', '.join([version[0] for version in version_images])}")
+    print(" ")
+    exit(0)
+
+
+def validate_container_name(container_name, command, script=False):
+    """Validate the container name provided by the user
+
+    Args:
+        container_name (str): name of the container provided by the user
+        command (str): mlc command
+        script (boolean): script mode (on: True, off: False) .Default: false.
 
     Raises:
-        ValueError: _description_
+        ValueError: The container name should contain at least one character.
+        ValueError: The container name should contains invalid characters.
+        ValueError: The container name already exists.
 
     Returns:
-        _type_: _description_
+        str, str: container name and associated container tag
     """
+
     _ , available_user_container_tags = existing_user_containers(user_name, command) 
     
     pattern = re.compile(r'^[a-zA-Z0-9_\-#]*$')
 
-    if container_name == "":
-        
-        raise ValueError(f"\n{ERROR}The container name should contain at least one character.{RESET}")
-    
+    if container_name == "":        
+        raise ValueError(f"\n{ERROR}The container name should contain at least one character.{RESET}")    
     elif not pattern.match(container_name):
         invalid_chars = [char for char in container_name if not re.match(r'[a-zA-Z0-9_\-#]', char)]
         invalid_chars_str = ''.join(invalid_chars)
@@ -1022,15 +1053,13 @@ def validate_container_name(container_name, command, script):
             raise ValueError(f"\n{INPUT}[{container_name}]{RESET} contains {ERROR}invalid{RESET} characters: {ERROR}{invalid_chars_str}{RESET}")
     else:
         # Generate a unique container tag
-        provided_container_tag = f"{container_name}._.{user_id}"
-        
+        provided_container_tag = f"{container_name}._.{user_id}"        
         if provided_container_tag in available_user_container_tags:
             if script:
                 print(f'\n{INPUT}[{container_name}]{RESET} {ERROR}already exists. Provide a new container name.{RESET}\n')
                 exit(1)
             else:
-                raise ValueError(f'\n{INPUT}[{container_name}]{RESET} {ERROR}already exists. Provide a new container name.{RESET}')
-        
+                raise ValueError(f'\n{INPUT}[{container_name}]{RESET} {ERROR}already exists. Provide a new container name.{RESET}')        
         return container_name, provided_container_tag
 
 
@@ -1055,12 +1084,16 @@ def main():
             
             #Get the existing gpu architecture    
             architectures = sorted(get_gpu_architectures(repo_file))
-            
+
             # Get the MLC_ARCH environment variable:
             mlc_repo_env_var = os.environ.get('MLC_ARCH')  
             
             # Set the gpu architecture based on a flag, an environment variable or a file-defined default architecture  
             architecture = args.architecture or mlc_repo_env_var or DEFAULT_ARCH
+            
+            # Extract framework, version and docker image from the ml_images.repo file
+            framework_version_docker = extract_from_ml_images(repo_file, architecture)
+            framework_version_docker_sorted = dict(sorted(framework_version_docker.items()))
             
             if args.script:
                 if architecture not in architectures:
@@ -1072,11 +1105,10 @@ def main():
                     display_gpu_architectures(architectures)
                     architecture_number = get_user_selection(f"{REQUEST}Enter the number of the desired architecture: {RESET}", len(architectures))
                     architecture = architectures[architecture_number - 1]
-
-            # Extract framework, version and docker image from the ml_images.repo file
-            framework_version_docker = extract_from_ml_images(repo_file, architecture)
-            framework_version_docker_sorted = dict(sorted(framework_version_docker.items()))
-           
+            
+            if args.info:
+                show_frameworks_versions(architecture, framework_version_docker_sorted)
+                
             # List existing containers/container_tags of the current user
             available_user_containers, available_user_container_tags = existing_user_containers(user_name, args.command)
             
@@ -1088,10 +1120,6 @@ def main():
                 print_info_header(args.command)
                 workspace_dir_be_asked = data_dir_be_asked = models_dir_be_asked = True            
            
-            # Set the container name and its validation        
-            validated_container_name, validated_container_tag = get_container_name(args.container_name, user_name, args.command, args.script)
-            
-
             # Set the framework:
             if args.framework is None:    
                 if args.script:
@@ -1116,7 +1144,6 @@ def main():
             # Set the version:
             version_images = framework_version_docker_sorted[selected_framework]
 
-            
             if args.version is None:
                 if args.script:
                     print(f"\n{ERROR}Version is missing.{RESET}\n")
@@ -1140,6 +1167,9 @@ def main():
             
             
             selected_version = args.version
+            
+            # Set the container name and its validation        
+            validated_container_name, validated_container_tag = get_container_name(args.container_name, user_name, args.command, args.script)
             
             # Select Workspace directory:
             default_workspace_dir = os.path.expanduser('~/workspace') 

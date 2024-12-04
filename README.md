@@ -29,7 +29,7 @@ Please read on in the [AIME MLC Installation Guide](aime-mlc-installation-guide.
 
 ### Create a machine learning container
 
-**mlc create container_name framework version [-w workspace\_dir] [-d data\_dir] [-m models\_dir] [-s|--script] [-arch|--architecture gpu_architecture] [-g|--num_gpus all]**
+**mlc create framework version container_name [-w workspace\_dir] [-d data\_dir] [-m models\_dir] [-s|--script] [-arch|--architecture gpu_architecture] [-g|--num_gpus all]**
 
 Create a new machine learning container
 
@@ -43,11 +43,16 @@ Available versions for NVIDIA Ada Lovelace based GPUs (RTX 4080/4090, RTX 4500/5
 
 *  Pytorch: 2.4.0, 2.3.1-aime, 2.3.0, 2.2.2, 2.2.0, 2.1.2-aime, 2.1.1-aime, 2.1.0-aime, 2.1.0, 2.0.1-aime, 2.0.1, 2.0.0, 1.14.0a-nvidia, 1.13.1-aime, 1.13.0a-nvidia, 1.12.1-aime
 
-
-Example to create a container in script mode '-s' with the name 'my-container' as Pytorch 2.4.0 with mounted user home directory as workspace, /data and /models as data and models directory, respectively, use:
+To print the available frameworks and corresponding versions, use:
 
 ```
-mlc create my-container Pytorch 2.4.0 -w /home/user_name/workspace -d /home/user/data -m /home/luis/models -s -arch CUDA_AMPERE
+mlc create --info
+```
+
+Example to create a container in script mode '-s' using Pytorch 2.4.0 with the name 'my-container' and with mounted user home directory as workspace, /data and /models as data and models directory, respectively, use:
+
+```
+mlc create Pytorch 2.4.0 my-container -w /home/user_name/workspace -d /home/user/data -m /home/luis/models -s -arch CUDA_AMPERE
 ```
 To provide greater flexibility in selecting a GPU architecture, users can specify the desired architecture for the current container using the -arch cuda_architecture flag (default: CUDA_ADA). If a fixed architecture is preferred for an entire session, it can be set by saving the desired GPU architecture in the MLC_ARCH environment variable, for example: export MLC_ARCH=CUDA.
 
