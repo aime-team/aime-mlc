@@ -27,6 +27,18 @@ Please read on in the [AIME MLC Installation Guide](aime-mlc-installation-guide.
 
 ## Usage
 
+To view detailed information about all available commands, use:
+```
+mlc -h
+```
+
+To get help for a specific command (e.g., create), use:
+
+```
+mlc create -h
+```
+
+
 ### Create a machine learning container
 
 **mlc create framework version container_name [-w workspace\_dir] [-d data\_dir] [-m models\_dir] [-s|--script] [-arch|--architecture gpu_architecture] [-g|--num_gpus all]**
@@ -123,7 +135,7 @@ CONTAINER           FRAMEWORK                  STATUS
 In case that you wish to see all containers created by all users:
 
 ```
-mlc list -a
+mlc list -au
 ```
 
 
