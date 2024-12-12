@@ -14,6 +14,7 @@ import json          # Handle JSON data
 import pathlib       # File system paths
 import csv           # Read/write CSV files
 import re            # Regular expressions
+from wcwidth import wcswidth
 
 # Set Default values gpu architecture, AIME mlc
 DEFAULT_ARCH = 'CUDA_ADA'
@@ -157,9 +158,39 @@ def get_flags():
     parser_list.add_argument(
         '-a', '--all', 
         action = "store_true", 
+        help='Show the full info of the created container/s.'
+    )
+    parser_list.add_argument(
+        '-au', '--all_users', 
+        action = "store_true", 
         help='Show the full info of the created container/s of all users.'
     )
-
+    parser_list.add_argument(
+        '-arch', '--architecture', 
+        action = "store_true", 
+        help='Show the gpu architecture info of the created container/s.'
+    )
+    parser_list.add_argument(
+        '-d', '--data', 
+        action = "store_true", 
+        help='Show the data directories info of the created container/s.'
+    )   
+    parser_list.add_argument(
+        '-m', '--models', 
+        action = "store_true", 
+        help='Show the models directories info of the created container/s.'
+    )      
+    parser_list.add_argument(
+        '-s', '--size', 
+        action = "store_true", 
+        help='Show the size info of the created container/s.'
+    ) 
+    parser_list.add_argument(
+        '-w', '--workspace', 
+        action = "store_true", 
+        help='Show the workspace directories info of the created container/s.'
+    )        
+       
     # Parser for the "open" command
     parser_open = subparsers.add_parser(
         'open', 
@@ -510,36 +541,6 @@ def filter_running_containers(running_containers, *lists):
 
     # Return a flattened tuple with no_running followed by running results
     return (*no_running_results, no_running_length, *running_results, running_length)
-
-
-def format_container_info(container_info_dict):
-    """Format the container info.
-
-    Args:
-        container_info_dict (dict): dict containing the whole info from the "docker container ls" command.
-
-    Returns:
-        list: lines containing the info for printing.
-    """
-    
-    # Extract the 'Labels' field
-    labels_string = container_info_dict.get('Labels', {})
-    # Split the labels string into key-value pairs
-    labels_dict = dict(pair.split('=', 1) for pair in labels_string.split(','))
-    
-    # Retrieve the value for 'aime.mlc.USER'
-    container_name = labels_dict["aime.mlc.NAME"]
-    size = container_info_dict['Size']
-    user_name = labels_dict.get("aime.mlc.USER", "N/A")
-    framework = labels_dict["aime.mlc.FRAMEWORK"]
-    status = container_info_dict['Status']
-    
-    #ToDo: customize the ouput based on user's flags
-    #info_to_be_printed = [f"[{container_name}]", size, user_name, framework, status]
-    # Show only container_name, framework and status
-    info_to_be_printed = [f"[{container_name}]", framework, status]
-
-    return info_to_be_printed 
 
 
 def get_gpu_architectures(filename):
@@ -936,15 +937,35 @@ def show_container_stats():
     process.terminate()        
 
 
-def show_container_info(flag):
+def short_home_path(provided_path):
+    """Replace the home directory with "~" if present
+
+    Args:
+        provided_path (str): path to be modify
+
+    Returns:
+        str: path with "~" if needed
+    """  
+    home_directory = os.path.expanduser("~")
+    
+    if provided_path == "-":
+        return "-"
+    elif provided_path == home_directory:
+        return provided_path
+    else:        
+        shortened_path = provided_path.replace(home_directory, "~", 1)
+        return shortened_path
+
+
+def show_container_info(**kwargs):
     """Print container info
 
     Args:
-        flag (str): flag argument provided by the user
+        flags (str): flag arguments provided by the user
     """
     
-    # Adapt the filter to the selected flags (no flag or --all)
-    filter_aime_mlc_user =  "label=aime.mlc" if flag else f"label=aime.mlc={user_name}"
+    # Adapt the filter to the selected flags
+    filter_aime_mlc_user =  "label=aime.mlc" if kwargs == {} or kwargs["all_users"] else f"label=aime.mlc={user_name}"
     docker_command_ls = [
         "docker", "container", 
         "ls", 
@@ -963,47 +984,97 @@ def show_container_info(flag):
     )
     
     # Communicate with the process to get output and errors
-    stdout_data, stderr_data = process.communicate()        
-    stdout_data = str(stdout_data.strip())
-
+    stdout_data, stderr_data = process.communicate()   
+       
     # Check for any errors
     if process.returncode != 0:
-        print(f"Error: {stderr_data}")
+        print(f"{ERROR}Error:{RESET}\n{stderr_data}")
+        exit(1)
     else:
         # If no stdout_data is received
         if not stdout_data:
             process.terminate()
             print(f"\n{ERROR}There are no containers. Create the first one using:{RESET}\n{HINT}mlc create container_name{RESET}\n")
-            exit(0)
-        # Split into individual lines and process them as JSON objects
-        output_lines = []
-        try:
-            # Split by newlines and parse each line as JSON
-            json_lines = stdout_data.split('\n')
-            containers_info = [json.loads(line) for line in json_lines if line]
-
-            # Apply formatting to all containers' info
-            output_lines = list(map(format_container_info, containers_info))
+            exit(0)    
+                
+        stdout_data_stripped = stdout_data.strip()
         
-        except json.JSONDecodeError:
-            print("Failed to decode JSON output.")
-        except KeyError as e:
-            print(f"Missing expected key: {e}")
-    #ToDo: customize the ouput based on user's flags
-    # Define an output format string with specified widths
-    #format_string = "{:<30}{:<30}{:<10}{:<20}{:<30}"
-    # Show only container_name, framework and status
-    format_string = "{:<30}{:<30}{:<30}"
+        # Titels  extracted from the kwargs
+        kwarg_keys_to_be_deleted = ["command", "all", "all_users"]
+        kwarg_titles = {key: key.upper() for key in kwargs if key not in kwarg_keys_to_be_deleted}
+        kwarg_titles["all_users"] = "USER"
+                
+        # Default columns to display
+        default_titles_to_display = ["CONTAINER", "FRAMEWORK", "STATUS"]
+        
+        # Columns when flag --all is set up:
+        titles_when_all_is_set = [ "USER", "SIZE", "ARCHITECTURE", "WORKSPACE", "DATA", "MODELS"]
 
-    print(f"\n{INFO}List of available containers:{RESET}")
-    #titles = ["CONTAINER", "SIZE", "USER", "FRAMEWORK", "STATUS"]
-    # Show only container_name, framework and status
-    titles = ["CONTAINER", "FRAMEWORK", "STATUS"]
+        # Add additional columns based on flags
+        if kwargs.get("all"):  
+            default_titles_to_display.extend(titles_when_all_is_set)
+        else:
+            default_titles_to_display.extend(kwarg_titles[key] for key in kwargs if key in kwarg_titles and kwargs[key] is True)        
+        
+        # Titles to be display on the top of the columns
+        titles_to_display = default_titles_to_display        
 
-    print(format_string.format(*titles))
-    print("\n".join(format_string.format(*info) for info in output_lines)+"\n")
+        columns_transcription = {
+            "CONTAINER": "aime.mlc.NAME",
+            "FRAMEWORK": "aime.mlc.FRAMEWORK", 
+            "STATUS": "Status",
+            "USER": "aime.mlc.USER",
+            "SIZE": "Size",
+            "ARCHITECTURE":"aime.mlc.ARCH",
+            "WORKSPACE": "aime.mlc.WORK_MOUNT",
+            "DATA": "aime.mlc.DATA_MOUNT",
+            "MODELS": "aime.mlc.MODELS_MOUNT"
+        }
+        # Select the values which can be written with '~' 
+        reduce_the_path = ["WORKSPACE", "DATA", "MODELS"]  
+              
+        # Values which can be written with '~' 
+        values_to_be_reduced = [columns_transcription[key] for key in reduce_the_path if key in columns_transcription]
+        
+        # Split by newlines and parse each line as JSON
+        json_lines = stdout_data_stripped.split('\n')
 
-def show_frameworks_versions(architecture, ml_images_content):
+        # List of all fields with info of the available containers
+        containers_info = [json.loads(line)for line in json_lines if line]
+        
+        # Flatten the dicts and apply short_home_path for keys in values_to_be_reduced
+        flattened_container_infos = [
+            {
+                **{key: short_home_path(value) if key in values_to_be_reduced 
+                   else f"[{value}]" if key == columns_transcription["CONTAINER"] 
+                   else value 
+                   for key, value in 
+                (pair.split('=', 1) for pair in container_dict["Labels"].split(','))},
+                **{key: value for key, value in container_dict.items() if key != "Labels"}
+            }
+            for container_dict in containers_info
+        ]
+      
+        # Assess the column widths for printing with a correct format
+        column_widths = {
+            key: max(len(key), *(len(container.get(columns_transcription[key], "")) for container in flattened_container_infos)) 
+            for key in titles_to_display
+        }
+        
+        # Build the format string dynamically
+        format_string = "".join(f"{{:<{column_widths[col]+2}}}" for col in titles_to_display)
+
+        # Print the titles
+        print("")
+        print(format_string.format(*(titles_to_display)))
+        
+        # Print the rows
+        for container in flattened_container_infos:
+            print(format_string.format(*(container.get(columns_transcription[key], '') for key in titles_to_display if key in columns_transcription)))
+        print("")
+        
+        
+def show_frameworks_versions(ml_images_content):
     """Print the available frameworks and versions by mlc create
 
     Args:
@@ -1012,13 +1083,12 @@ def show_frameworks_versions(architecture, ml_images_content):
     """    
 
     frameworks = list(ml_images_content.keys())
-    print(f"{INFO}\nAvailable frameworks and versions (gpu architecture: {INPUT}{architecture}{RESET}{INFO}):{RESET}")
+    print(f"{INFO}\nAvailable frameworks and versions:{RESET}")
     for framework in frameworks:
         version_images = ml_images_content[framework]
-        print(f"{framework}: {', '.join([version[0] for version in version_images])}")
+        print(f"{HINT}{framework}:{RESET} \n{', '.join([version[0] for version in version_images])}")
     print(" ")
     exit(0)
-
 
 def validate_container_name(container_name, command, script=False):
     """Validate the container name provided by the user
@@ -1030,7 +1100,7 @@ def validate_container_name(container_name, command, script=False):
 
     Raises:
         ValueError: The container name should contain at least one character.
-        ValueError: The container name should contains invalid characters.
+        ValueError: The container name contains invalid characters.
         ValueError: The container name already exists.
 
     Returns:
@@ -1088,7 +1158,7 @@ def main():
             # Get the MLC_ARCH environment variable:
             mlc_repo_env_var = os.environ.get('MLC_ARCH')  
             
-            # Set the gpu architecture based on a flag, an environment variable or a file-defined default architecture  
+            # Set the gpu architecture based on a flag, an environment variable or the default constant DEFAULT_ARCH located at the beginning of this file
             architecture = args.architecture or mlc_repo_env_var or DEFAULT_ARCH
             
             # Extract framework, version and docker image from the ml_images.repo file
@@ -1107,7 +1177,8 @@ def main():
                     architecture = architectures[architecture_number - 1]
             
             if args.info:
-                show_frameworks_versions(architecture, framework_version_docker_sorted)
+                print(f"\n{INFO}Available gpu architectures ({INPUT}currently used{RESET}{INFO}):{RESET}\n" + ', '.join(f"{INPUT}{arch}{RESET}" if arch == architecture else arch for arch in architectures))
+                show_frameworks_versions(framework_version_docker_sorted)
                 
             # List existing containers/container_tags of the current user
             available_user_containers, available_user_container_tags = existing_user_containers(user_name, args.command)
@@ -1189,7 +1260,7 @@ def main():
                             print(f"\n{ERROR}Workspace directory does not exist:{RESET} {INPUT}{provided_workspace_dir}{RESET}\n")
                             exit(0)
                         print(f"\n{ERROR}Workspace directory does not exist:{RESET} {INPUT}{provided_workspace_dir}{RESET}")
-                        provided_workspace_dir = os.path.expanduser(input(f"\n{REQUEST}Provide the new location of the workspace directory: {RESET}").strip())
+                        provided_workspace_dir = os.path.expanduser(input(f"\n{REQUEST}Provide the new location of the WORKSPACE directory: {RESET}").strip())
                 workspace_dir = provided_workspace_dir
                 workspace_dir_updated = True
                 workspace_dir_be_asked = False
@@ -1218,7 +1289,7 @@ def main():
                             break
                         elif keep_workspace_dir in ["n","no"]:
                             while True:
-                                provided_workspace_dir = os.path.expanduser(input(f"\n{REQUEST}Provide the new location of the workspace directory: {RESET}").strip())  # Expand '~' to full path
+                                provided_workspace_dir = os.path.expanduser(input(f"\n{REQUEST}Provide the new location of the WORKSPACE directory: {RESET}").strip())  # Expand '~' to full path
                                 # Check if the provided workspace directory exist:
                                 if os.path.isdir(provided_workspace_dir):
                                     workspace_dir = provided_workspace_dir
@@ -1251,7 +1322,7 @@ def main():
                             print(f"\n{ERROR}Data directory does not exist:{RESET} {INPUT}{provided_data_dir}{RESET}\n")
                             exit(0)
                         print(f"\n{ERROR}Data directory does not exist:{RESET} {INPUT}{provided_data_dir}{RESET}")
-                        provided_data_dir = os.path.expanduser(input(f"\n{REQUEST}Provide the new location of the data directory: {RESET}").strip())
+                        provided_data_dir = os.path.expanduser(input(f"\n{REQUEST}Provide the new location of the DATA directory: {RESET}").strip())
                 data_dir = provided_data_dir
                 data_dir_updated = True
                 data_dir_be_asked = False
@@ -1270,13 +1341,13 @@ def main():
                     # Define a variable to control breaking out of both loops
                     break_inner_loop = False
                     while True:                    
-                        provide_data_dir = input(f"\n{REQUEST}Do you want to provide a data directory (y/N)?: {RESET}").strip().lower()
+                        provide_data_dir = input(f"\n{REQUEST}Do you want to provide a DATA directory (y/N)?: {RESET}").strip().lower()
 
                         if provide_data_dir in ["n","no", ""]:
                             break
                         elif provide_data_dir in ["y","yes"]:
                             while True:
-                                provided_data_dir = os.path.expanduser(input(f"\n{REQUEST}Provide the new location of the data directory: {RESET}").strip())  # Expand '~' to full path
+                                provided_data_dir = os.path.expanduser(input(f"\n{REQUEST}Provide the new location of the DATA directory: {RESET}").strip())  # Expand '~' to full path
                                 # Check if the provided data directory exists:
                                 if os.path.isdir(provided_data_dir):
                                     data_dir = provided_data_dir
@@ -1309,7 +1380,7 @@ def main():
                             print(f"\n{ERROR}Models directory does not exist:{RESET} {INPUT}{provided_models_dir}{RESET}\n")
                             exit(0)
                         print(f"\n{ERROR}Models directory does not exist:{RESET} {INPUT}{provided_models_dir}{RESET}")
-                        provided_models_dir = os.path.expanduser(input(f"\n{REQUEST}Provide the new location of the models directory: {RESET}").strip())
+                        provided_models_dir = os.path.expanduser(input(f"\n{REQUEST}Provide the new location of the MODELS directory: {RESET}").strip())
                 models_dir = provided_models_dir
                 models_dir_updated = True
                 models_dir_be_asked = False
@@ -1329,13 +1400,13 @@ def main():
                     break_inner_loop = False
                     while True:
                         
-                        provide_models_dir = input(f"\n{REQUEST}Do you want to provide a models directory (y/N)?: {RESET}").strip().lower()
+                        provide_models_dir = input(f"\n{REQUEST}Do you want to provide a MODELS directory (y/N)?: {RESET}").strip().lower()
 
                         if provide_models_dir in ["n","no", ""]:
                             break
                         elif provide_models_dir in ["y","yes"]:
                             while True:
-                                provided_models_dir = os.path.expanduser(input(f"\n{REQUEST}Provide the new location of the models directory: {RESET}").strip())  # Expand '~' to full path
+                                provided_models_dir = os.path.expanduser(input(f"\n{REQUEST}Provide the new location of the MODELS directory: {RESET}").strip())  # Expand '~' to full path
                                 # Check if the provided models directory exists:
                                 if os.path.isdir(provided_models_dir):
                                     models_dir = provided_models_dir
@@ -1376,7 +1447,7 @@ def main():
             # Check if a container with the generated tag already exists
             if container_tag == check_container_exists(container_tag):
                 print(f"\n{ERROR}Error:{RESET} \n {INPUT}[{validated_container_name}]{RESET} already exists.{RESET}")
-                show_container_info(False)
+                show_container_info()
                 exit(0)
             else:
                 print(f"\n{NEUTRAL}The container will be created:{RESET} {INPUT}{validated_container_name}{RESET} ")
@@ -1466,8 +1537,9 @@ def main():
                 '--name', container_tag,
                 '--label', f'{container_label}={user_name}', 
                 '--label', f'{container_label}.NAME={validated_container_name}',
-                '--label', f'{container_label}.USER={user_name}', 
-                '--label', f'{container_label}.VERSION={mlc_container_version}',
+                '--label', f'{container_label}.USER={user_name}',
+                '--label', f'{container_label}.ARCH={architecture}', 
+                '--label', f'{container_label}.MLC_VERSION={mlc_container_version}',
                 '--label', f'{container_label}.WORK_MOUNT={workspace_dir}', 
                 '--label', f'{container_label}.DATA_MOUNT={data_dir}',
                 '--label', f'{container_label}.MODELS_MOUNT={models_dir}',                          
@@ -1501,7 +1573,7 @@ def main():
                      
         if args.command == 'list':
  
-            show_container_info(args.all)                    
+            show_container_info(**vars(args))                    
 
             
         if args.command == 'open':           
@@ -1597,7 +1669,7 @@ def main():
             if args.container_name:                 
                 if no_running_container_number == 0:                    
                     print(f"\n{ERROR}All containers are running.\nIf you want to remove a container, stop it before using:{RESET}{HINT}\nmlc stop container_name{RESET}")
-                    show_container_info(False)
+                    show_container_info()
                     exit(0)                    
                 if args.container_name in running_containers:                    
                     if args.script:                        
@@ -1628,7 +1700,7 @@ def main():
                     
                         # all containers are running
                         if no_running_container_number == 0:
-                            show_container_info(False)
+                            show_container_info()
                             exit(0) 
                                                         
                         while True:
@@ -1640,7 +1712,7 @@ def main():
                 # Check that at least 1 container is no running
                 if no_running_container_number == 0:                    
                     print(f"\n{ERROR}All containers are running.\nIf you want to remove a container, stop it before using:{RESET}{HINT}\nmlc stop container_name{RESET}")
-                    show_container_info(False)
+                    show_container_info()
                     exit(0)                
                 if args.script:                
                     print(f"\n{ERROR}Container name is missing.{RESET}")
@@ -1706,7 +1778,7 @@ def main():
                     print(
                         f"{ERROR}\nAt the moment all containers are running.\nCreate a new one and start it using:{RESET}\n{HINT}mlc start container_name{RESET}"
                     )
-                    show_container_info(False) 
+                    show_container_info() 
                     exit(0)
                 
                 if args.container_name in running_containers:                    
@@ -1729,7 +1801,7 @@ def main():
                     else:                        
                         print(f"\n{INPUT}[{args.container_name}]{RESET} {ERROR}does not exist.{RESET}")                    
                         if no_running_container_number == 0:                            
-                            show_container_info(False)
+                            show_container_info()
                             exit(1)
                         
                         while True:                            
@@ -1741,7 +1813,7 @@ def main():
                     print(
                         f"{ERROR}\nAt the moment all containers are running.\nCreate a new one and start it using:{RESET}\n{HINT}mlc start container_name{RESET}"
                     )
-                    show_container_info(False) 
+                    show_container_info() 
                     exit(0)  
 
                 if args.script:                
@@ -1808,7 +1880,7 @@ def main():
                     print(                        
                         f"{ERROR}\nAll containers are stopped. You cannot stop no running containers.{RESET}"
                     )
-                    show_container_info(False) 
+                    show_container_info() 
                     exit(0)
 
                 if args.container_name in no_running_containers: 
@@ -1845,7 +1917,7 @@ def main():
                 # Check that at least 1 container is running
                 if not running_container_tags:                
                     print(f"\n{ERROR}All containers are stopped. Therefore there are no one to be stopped.{RESET}")
-                    show_container_info(False)
+                    show_container_info()
                     exit(0)
                 
                 if args.script:                

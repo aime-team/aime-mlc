@@ -468,7 +468,7 @@ Now we clone the aime-ml-containers from AIME's [Github](https://github.com/aime
 
 ```
 
-git clone --branch stable-cuda-ada https://github.com/aime-team/aime-ml-containers.git /home/$USER/aime-ml-containers
+git clone https://github.com/aime-team/aime-ml-containers.git /home/$USER/aime-ml-containers
 
 ```
 
@@ -491,7 +491,7 @@ AIME offers solutions for the AIME MLCs depending on the model of the GPU, NVIDI
 - ROCM5: for AMD ROCM 5.0 supported GPUs
 
 
-Users can specify the desired architecture for the current container using the -arch cuda_architecture flag (default: CUDA_ADA). If a fixed architecture is preferred for an entire session, it can be set by saving the desired GPU architecture in the MLC_ARCH environment variable, for example: export MLC_ARCH=CUDA.
+Users can specify the desired architecture for the current container using the -arch cuda_architecture flag (default: CUDA_ADA). If a fixed architecture is preferred for an entire session, it can be set by saving the desired GPU architecture in the MLC_ARCH environment variable using, for example: export MLC_ARCH=CUDA.
 
 It is important to note that the -arch flag takes precedence over the environment variable value. Similarly, if the environment variable is defined, it overrides the default architecture setting.
 
