@@ -323,22 +323,31 @@ def are_you_sure(selected_container_name, command, script = False):
     if not script:        
         if command == "create":            
             print(f"\n{WARNING}Verify if the provided setup is correct. The creation of a container may take a little time.{RESET}")
-            printed_verb = command + "d"    
+            printed_verb = command + "d"
+            prompt = f"\n{INPUT}[{selected_container_name}]{RESET} {REQUEST}will be {printed_verb}. Are you sure(Y/n)?: {RESET}"
+            yes_answers = ["y", "yes", ""]
+            no_answers = ["n", "no"]
         elif command == "remove":            
             print(f"\n{WARNING}Caution: After your selection, there is no option to recover the container.{RESET}")            
-            printed_verb = command + "d"            
+            printed_verb = command + "d"
+            prompt = f"\n{INPUT}[{selected_container_name}]{RESET} {REQUEST}will be {printed_verb}. Are you sure(y/N)?: {RESET}"
+            yes_answers = ["y", "yes"]
+            no_answers = ["n", "no", ""]          
         elif command == "stop":            
             print(f"\n{WARNING}Caution: All running processes of the selected container will be terminated.{RESET}")
-            printed_verb = command + "ped"            
+            printed_verb = command + "ped"
+            prompt = f"\n{INPUT}[{selected_container_name}]{RESET} {REQUEST}will be {printed_verb}. Are you sure(y/N)?: {RESET}"
+            yes_answers = ["y", "yes"]
+            no_answers = ["n", "no", ""]           
         else:
             exit(1)            
         
         while True:
-            are_you_sure_answer = input(f"\n{INPUT}[{selected_container_name}]{RESET} {REQUEST}will be {printed_verb}. Are you sure(y/N)?: {RESET}").strip().lower()            
+            are_you_sure_answer = input(prompt).strip().lower()            
             
-            if are_you_sure_answer in ["y", "yes"]: 
+            if are_you_sure_answer in yes_answers: 
                 break            
-            elif are_you_sure_answer in ["n", "no", ""]:                
+            elif are_you_sure_answer in no_answers:                
                 print(f"\n{INPUT}[{selected_container_name}]{RESET} {NEUTRAL}will not be {printed_verb}.\n{RESET}")                
                 exit(0)                
             else:                
