@@ -14,7 +14,7 @@ import json          # Handle JSON data
 import pathlib       # File system paths
 import csv           # Read/write CSV files
 import re            # Regular expressions
-from wcwidth import wcswidth
+
 
 # Set Default values gpu architecture, AIME mlc
 DEFAULT_ARCH = 'CUDA_ADA'
@@ -335,6 +335,7 @@ def are_you_sure(selected_container_name, command, script = False):
         
         while True:
             are_you_sure_answer = input(f"\n{INPUT}[{selected_container_name}]{RESET} {REQUEST}will be {printed_verb}. Are you sure(y/N)?: {RESET}").strip().lower()            
+            
             if are_you_sure_answer in ["y", "yes"]: 
                 break            
             elif are_you_sure_answer in ["n", "no", ""]:                
