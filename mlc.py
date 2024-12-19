@@ -51,13 +51,21 @@ aime_copyright_claim = f"""{AIME_LOGO}
     Copyright (c) AIME GmbH and affiliates.                               
 {RESET}"""
 
+# Customization of the argument parser
+class CustomArgumentParser(argparse.ArgumentParser):
+    def error(self, message):
+        print(f"\n{ERROR}Please provide one of the following valid commands:{RESET}\ncreate, list, open, remove, start, stats, stop, update-sys\n")
+        exit(1)
+
+
 def get_flags():
     """_summary_
 
     Returns:
         _type_: _description_
     """
-    parser = argparse.ArgumentParser(
+    #parser = CustomArgumentParser argparse.ArgumentParser
+    parser = CustomArgumentParser(
         #ToDo: improve the description using a customized class
         description=f'{aime_copyright_claim}{AIME_LOGO}AIME Machine Learning Container management system.\nEasily install, run and manage Docker containers\nfor Pytorch and Tensorflow deep learning frameworks.{RESET}',
         usage = f"\nmlc [-h] [-v] <command> [-h]",
@@ -84,6 +92,12 @@ def get_flags():
         formatter_class = argparse.RawTextHelpFormatter
     ) 
     parser_create.add_argument(
+        'container_name', 
+        nargs='?', 
+        type=str, 
+        help='Name of the container.'
+    )
+    parser_create.add_argument(
         'framework', 
         nargs='?', 
         type=str, 
@@ -95,12 +109,6 @@ def get_flags():
         type=str, 
         help='Version of the framework.'
     )
-    parser_create.add_argument(
-        'container_name', 
-        nargs='?', 
-        type=str, 
-        help='Name of the container.'
-    ) 
     parser_create.add_argument(
         '-arch', '--architecture', 
         type=str,
@@ -127,7 +135,7 @@ def get_flags():
     parser_create.add_argument(
         '-i', '--info', 
         action='store_true',
-        help='Show the available AI frameworks and versions (default: off).'
+        help='Show the available AI frameworks and versions (default: interactive mode).'
     )
     parser_create.add_argument(
         '-m', '--models_dir', 
@@ -138,7 +146,7 @@ def get_flags():
     parser_create.add_argument(
         '-s', '--script', 
         action='store_true',
-        help='Enable script mode (default: off).'
+        help='Enable script mode (default: interactive mode).'
     )
     parser_create.add_argument(
         '-w', '--workspace_dir', 
@@ -208,7 +216,7 @@ def get_flags():
     parser_open.add_argument(
         '-s', '--script', 
         action='store_true', 
-        help="Enable script mode (default: off)."
+        help="Enable script mode (default: interactive mode)."
     )
     
     # Parser for the "remove" command
@@ -216,7 +224,7 @@ def get_flags():
         'remove',
         usage=f"\n{INPUT}mlc remove <container_name> [-s|--script] [-f|--force]{RESET}",
         description="Remove an existing and no running machine learning container.",
-        help="Remove an existing and no running machine learning container ."
+        help="Remove an existing and no running machine learning container."
     )
     parser_remove.add_argument(
         'container_name', 
@@ -232,7 +240,7 @@ def get_flags():
     parser_remove.add_argument(
         '-s', '--script', 
         action='store_true', 
-        help="Enable script mode (default: off)."
+        help="Enable script mode (default: interactive mode)."
     )
     
     # Parser for the "start" command
@@ -251,7 +259,7 @@ def get_flags():
     parser_start.add_argument(
         '-s', '--script', 
         action='store_true', 
-        help="Enable script mode (default: off)."
+        help="Enable script mode (default: interactive mode)."
     )
     
     # Parser for the "stats" command
@@ -283,7 +291,7 @@ def get_flags():
     parser_stop.add_argument(
         '-s', '--script', 
         action='store_true', 
-        help="Enable script mode (default: off)."
+        help="Enable script mode (default: interactive mode)."
     )
     # Parser for the "update-sys" command
     parser_update_sys = subparsers.add_parser(
@@ -300,12 +308,13 @@ def get_flags():
             
     # Extract subparser names
     subparser_names = subparsers.choices.keys()
-    available_commands = list(subparser_names)
+    # ToDo: check if needed
+    #available_commands = list(subparser_names)
 
     # Parse arguments
     args = parser.parse_args()
          
-    return args, available_commands
+    return args
 
 
 ################################################################################################################################################
@@ -456,11 +465,7 @@ def extract_from_ml_images(filename, filter_architecture=DEFAULT_ARCH):
                     frameworks_dict[framework] = []
                     frameworks_dict[framework].append((version, docker_image))
                 else:
-                    frameworks_dict[framework].append((version, docker_image))
-    if not frameworks_dict:
-        print(f"No frameworks found with architecture '{filter_architecture}'.")
-        exit(1)
-    
+                    frameworks_dict[framework].append((version, docker_image)) 
     return frameworks_dict
 
 
@@ -488,30 +493,6 @@ def existing_user_containers(user_name, mlc_command):
     container_names = [re.match(r"^(.*?)\._\.\w+$", container).group(1) for container in container_tags]
 
     return container_names, container_tags
-
-
-def format_container_stats(container_stats_dict):
-    """Format the container info provided by the stats.
-
-    Args:
-        container_stats_dict (dict): dictionay containing the whole stats of a container.
-
-    Returns:
-        list: stats line representing the columns of the output.
-    """  
-
-    #ToDo: check if labels_string is needed  
-    # Extract the 'Labels' field
-    #labels_string = container_stats_dict.get('Labels', {})
-    # Retrieve the value for 'aime.mlc.USER'
-    container_name = container_stats_dict["Name"].split('._.')[0]
-    cpu_usage_perc = container_stats_dict["CPUPerc"]
-    memory_usage = container_stats_dict["MemUsage"]
-    memory_usage_perc = container_stats_dict["MemPerc"]
-    processes_active = container_stats_dict["PIDs"]
-    stats_line_to_be_printed = [f"[{container_name}]", cpu_usage_perc, memory_usage, memory_usage_perc, processes_active]
-
-    return stats_line_to_be_printed
 
 
 def filter_by_state(state, running_containers, *lists):
@@ -551,6 +532,30 @@ def filter_running_containers(running_containers, *lists):
 
     # Return a flattened tuple with no_running followed by running results
     return (*no_running_results, no_running_length, *running_results, running_length)
+
+
+def format_container_stats(container_stats_dict):
+    """Format the container info provided by the stats.
+
+    Args:
+        container_stats_dict (dict): dictionay containing the whole stats of a container.
+
+    Returns:
+        list: stats line representing the columns of the output.
+    """  
+
+    #ToDo: check if labels_string is needed  
+    # Extract the 'Labels' field
+    #labels_string = container_stats_dict.get('Labels', {})
+    # Retrieve the value for 'aime.mlc.USER'
+    container_name = container_stats_dict["Name"].split('._.')[0]
+    cpu_usage_perc = container_stats_dict["CPUPerc"]
+    memory_usage = container_stats_dict["MemUsage"]
+    memory_usage_perc = container_stats_dict["MemPerc"]
+    processes_active = container_stats_dict["PIDs"]
+    stats_line_to_be_printed = [f"[{container_name}]", cpu_usage_perc, memory_usage, memory_usage_perc, processes_active]
+
+    return stats_line_to_be_printed
 
 
 def get_gpu_architectures(filename):
@@ -643,6 +648,27 @@ def get_container_name(container_name, user_name, command, script=False):
 
     # ToDo: customize i/o usign user_name. 
 
+    if script and not container_name:
+        print(f"\n{ERROR}Container name is missing.{RESET}\n")
+        exit(1)
+    elif not script and container_name:
+        while True:
+            try:                 
+                return validate_container_name(container_name, command, script)            
+            except ValueError as e:
+                print(e)
+                container_name = input(f"\n{REQUEST}Enter a container name (valid characters: a-z, A-Z, 0-9, _,-,#): {RESET}")
+    elif not script and not container_name:   
+        while True:                           
+            container_name = input(f"\n{REQUEST}Enter a container name (valid characters: a-z, A-Z, 0-9, _,-,#): {RESET}")
+            try:
+                return validate_container_name(container_name, command, script)
+            except ValueError as e:
+                print(e)
+    else:
+        return validate_container_name(container_name, command, script) 
+        
+    """
     if container_name:                
         while True:
             try:                 
@@ -660,7 +686,9 @@ def get_container_name(container_name, user_name, command, script=False):
                 try:
                     return validate_container_name(container_name, command, script)
                 except ValueError as e:
-                    print(e)                   
+                    print(e)         
+    """
+
 
 
 def get_docker_image(version, images):
@@ -728,9 +756,9 @@ def print_info_header(command):
             f"    {INFO_HEADER}Info{RESET}: \
             \n    Create a new container \
             \n\n    {INFO_HEADER}How to use{RESET}: \
-            \n    mlc create <framework_name> <framework_version> <container_name> -w <workspace_directory> -d <data_directory> -m <models_directory> -s -arch <gpu_architecture> -ng <number of gpus> \
+            \n    mlc create <container_name> <framework_name> <framework_version> -w <workspace_directory> -d <data_directory> -m <models_directory> -s -arch <gpu_architecture> -ng <number of gpus> \
             \n\n    {INFO_HEADER}Example{RESET}: \
-            \n    mlc create Pytorch 2.3.1-aime pt231aime -w /home/$USER/workspace -d /data -m /home/$USER/models -s -ng 1\n" 
+            \n    mlc create pt231aime Pytorch 2.3.1-aime -w /home/$USER/workspace -d /data -m /home/$USER/models -s -ng 1\n" 
         ) 
                 
     if command == "open":
@@ -1127,10 +1155,10 @@ def validate_container_name(container_name, command, script=False):
         invalid_chars = [char for char in container_name if not re.match(r'[a-zA-Z0-9_\-#]', char)]
         invalid_chars_str = ''.join(invalid_chars)
         if script:
-            print(f"\n{INPUT}[{container_name}]{RESET} contains {ERROR}invalid{RESET} characters: {ERROR}{invalid_chars_str}{RESET}")
+            print(f"\n{INPUT}[{container_name}]{RESET} contains {ERROR}invalid{RESET} characters: {ERROR}{invalid_chars_str}{RESET}\n")
             exit(1)
         else:
-            raise ValueError(f"\n{INPUT}[{container_name}]{RESET} contains {ERROR}invalid{RESET} characters: {ERROR}{invalid_chars_str}{RESET}")
+            raise ValueError(f"\n{INPUT}[{container_name}]{RESET} contains {ERROR}invalid{RESET} characters: {ERROR}{invalid_chars_str}{RESET}\n")
     else:
         # Generate a unique container tag
         provided_container_tag = f"{container_name}._.{user_id}"        
@@ -1148,7 +1176,7 @@ def validate_container_name(container_name, command, script=False):
 def main():
     try: 
         # Arguments parsing
-        args, available_commands = get_flags()
+        args = get_flags()
            
         if not args.command:
             print(f"\nUse {INPUT}mlc -h{RESET} or {INPUT}mlc --help{RESET} to get more informations about the AIME MLC tool.\n")
@@ -1171,21 +1199,23 @@ def main():
             # Set the gpu architecture based on a flag, an environment variable or the default constant DEFAULT_ARCH located at the beginning of this file
             architecture = args.architecture or mlc_repo_env_var or DEFAULT_ARCH
             
-            # Extract framework, version and docker image from the ml_images.repo file
-            framework_version_docker = extract_from_ml_images(repo_file, architecture)
-            framework_version_docker_sorted = dict(sorted(framework_version_docker.items()))
-            
+            # Check gpu architecture
             if args.script:
                 if architecture not in architectures:
                     print(f"\n{ERROR}Unknown gpu architecture:{RESET} {INPUT}{architecture}{RESET} \n\n{INFO}Available gpu architectures:{RESET}\n{', '.join(architectures)}\n")
                     exit(1)
             else:
                 while architecture not in architectures:
-                    print(f"\n {ERROR}Unknown gpu architecture:{RESET} {INPUT}{architecture}{RESET}")
+                    print(f"\n{ERROR}Unknown gpu architecture:{RESET} {INPUT}{architecture}{RESET}")
                     display_gpu_architectures(architectures)
                     architecture_number = get_user_selection(f"{REQUEST}Enter the number of the desired architecture: {RESET}", len(architectures))
-                    architecture = architectures[architecture_number - 1]
+                    architecture = architectures[architecture_number - 1]            
             
+            # Extract framework, version and docker image from the ml_images.repo file
+            framework_version_docker = extract_from_ml_images(repo_file, architecture)
+            framework_version_docker_sorted = dict(sorted(framework_version_docker.items()))
+            
+            # Check if the user requests more info about available gpu architecture, framework and version 
             if args.info:
                 print(f"\n{INFO}Available gpu architectures ({INPUT}currently used{RESET}{INFO}):{RESET}\n" + ', '.join(f"{INPUT}{arch}{RESET}" if arch == architecture else arch for arch in architectures))
                 show_frameworks_versions(framework_version_docker_sorted)
@@ -1196,61 +1226,74 @@ def main():
             # Set the variables to know if the workspace, data and models directories should be asked 
             workspace_dir_be_asked = data_dir_be_asked = models_dir_be_asked = False
 
-            # Print an info header   
+            # Print an info header only when the positional arguments (container name, frameworl and version) are not provided 
             if args.container_name is None and args.framework is None and args.version is None:
                 print_info_header(args.command)
                 workspace_dir_be_asked = data_dir_be_asked = models_dir_be_asked = True            
-           
-            # Set the framework:
-            if args.framework is None:    
-                if args.script:
-                    print(f"\n{ERROR}Framework is needed.{RESET}\n")
-                    exit(1)                                            
-                else: 
-                    while args.framework is None:    
-                        args.framework = set_framework(framework_version_docker_sorted) 
-            else:    
-                while True:                    
-                    if not framework_version_docker_sorted.get(args.framework):
-                        if args.script:
-                            print(f"\n{ERROR}Unknown framework:{RESET} {INPUT}{args.framework}{RESET}\n\n{REQUEST}Available AI frameworks:{RESET}\n{', '.join(framework_version_docker_sorted.keys())}\n")
-                            exit(1)                        
-                        else:
-                            args.framework = set_framework(framework_version_docker_sorted) 
-                    else:
-                        break
-            
-            selected_framework = args.framework
-                
-            # Set the version:
-            version_images = framework_version_docker_sorted[selected_framework]
+                        
+            if args.script:
+                # Set the container name and its validation        
+                validated_container_name, validated_container_tag = get_container_name(args.container_name, user_name, args.command, args.script)
 
-            if args.version is None:
-                if args.script:
-                    print(f"\n{ERROR}Version is missing.{RESET}\n")
+                # Set the framework:
+                if args.framework is None: 
+                    print(f"\n{ERROR}Framework is needed.{RESET}\n")
+                    exit(1)
+                else:
+                    if not framework_version_docker_sorted.get(args.framework):
+                        print(f"\n{ERROR}Unknown framework:{RESET} {INPUT}{args.framework}{RESET}\n\n{REQUEST}Available AI frameworks:{RESET}\n{', '.join(framework_version_docker_sorted.keys())}\n")
+                        exit(1)
+                    else:
+                        selected_framework = args.framework
+                
+                # Set the version:
+                version_images = framework_version_docker_sorted[selected_framework]
+                
+                if args.version is None:
+                    print(f"\n{ERROR}Version is needed.{RESET}\n")
                     exit(1)
                 else:                     
-                    while args.version is None:
-                        args.version, selected_docker_image = set_version(selected_framework, version_images) 
-
-            else:                
-                available_versions = [version[0] for version in version_images]
-                while True:
+                    available_versions = [version[0] for version in version_images]
                     if args.version in available_versions:
                         selected_docker_image = get_docker_image(args.version, version_images)
-                        break
+                        selected_version = args.version
                     else:
-                        if args.script:
-                            print(f"\n{ERROR}Version is not available:{RESET} {INPUT}{args.version}{RESET}\n")
-                            exit(1)                            
-                        else:    
-                            args.version, selected_docker_image = set_version(selected_framework, version_images) 
-            
-            
-            selected_version = args.version
-            
-            # Set the container name and its validation        
-            validated_container_name, validated_container_tag = get_container_name(args.container_name, user_name, args.command, args.script)
+                        print(f"\n{ERROR}Version is not available:{RESET} {INPUT}{args.version}{RESET}\n")
+                        exit(1)                      
+            else:                
+                if args.framework is None:    
+                    while args.framework is None:
+                        args.framework = set_framework(framework_version_docker_sorted)
+                else:
+                    while True:                    
+                        if not framework_version_docker_sorted.get(args.framework):
+                            print(f"\n{ERROR}Unknown framework:{RESET} {INPUT}{args.framework}{RESET}")
+                            args.framework = set_framework(framework_version_docker_sorted) 
+                        else:
+                            break
+                selected_framework = args.framework 
+                
+                # Set the version:
+                version_images = framework_version_docker_sorted[selected_framework] 
+                
+                if args.version is None:
+                    #print(f"\n{ERROR}Version is needed.{RESET}")                    
+                    while args.version is None:
+                        args.version, selected_docker_image = set_version(selected_framework, version_images)                        
+                else:                                   
+                    available_versions = [version[0] for version in version_images]
+                    while True:
+                        if args.version in available_versions:
+                            selected_docker_image = get_docker_image(args.version, version_images)
+                            break
+                        else:
+                            print(f"\n{ERROR}Version is not available:{RESET} {INPUT}{args.version}{RESET}")
+                            args.version, selected_docker_image = set_version(selected_framework, version_images)           
+                selected_version = args.version                       
+                        
+                # Set the container name and its validation        
+                validated_container_name, validated_container_tag = get_container_name(args.container_name, user_name, args.command, args.script)
+               
             
             # Select Workspace directory:
             default_workspace_dir = os.path.expanduser('~/workspace') 

@@ -41,7 +41,7 @@ mlc create -h
 
 ### Create a machine learning container
 
-**mlc create framework version container_name [-w workspace\_dir] [-d data\_dir] [-m models\_dir] [-s|--script] [-arch|--architecture gpu_architecture] [-g|--num_gpus all]**
+**mlc create container_name framework version [-w workspace\_dir] [-d data\_dir] [-m models\_dir] [-s|--script] [-arch|--architecture gpu_architecture] [-g|--num_gpus all]**
 
 Create a new machine learning container
 
@@ -64,7 +64,7 @@ mlc create --info
 Example to create a container in script mode '-s' using Pytorch 2.4.0 with the name 'my-container' and with mounted user home directory as workspace, /data and /models as data and models directory, respectively, use:
 
 ```
-mlc create Pytorch 2.4.0 my-container -w /home/user_name/workspace -d /home/user/data -m /home/luis/models -s -arch CUDA_AMPERE
+mlc create my-container Pytorch 2.4.0 -w /home/user_name/workspace -d /home/user/data -m /home/luis/models -s -arch CUDA_AMPERE
 ```
 To provide greater flexibility in selecting a GPU architecture, users can specify the desired architecture for the current container using the -arch cuda_architecture flag (default: CUDA_ADA). If a fixed architecture is preferred for an entire session, it can be set by saving the desired GPU architecture in the MLC_ARCH environment variable, for example: export MLC_ARCH=CUDA.
 

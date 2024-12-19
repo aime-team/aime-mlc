@@ -463,12 +463,12 @@ mkdir /home/$USER/workspace
 ```
 
 
-Now we clone the aime-ml-containers from AIME's [Github](https://github.com/aime-team/aime-ml-containers) web site, selecting the most appropriate branch for your installed GPU, on the location you prefer. The recommended location would be somewhere where you don't need sudo rights, e.g. within the home directory:
+Now we clone the aime-ml-containers from AIME's [Github](https://github.com/aime-team/aime-mlc) web site, selecting the most appropriate branch for your installed GPU, on the location you prefer. The recommended location would be somewhere where you don't need sudo rights, e.g. within the home directory:
 
 
 ```
 
-git clone https://github.com/aime-team/aime-ml-containers.git /home/$USER/aime-ml-containers
+git clone https://github.com/aime-team/aime-mlc.git /home/$USER/aime-mlc
 
 ```
 
@@ -500,10 +500,10 @@ The next step is to add in /home/user/.bashrc the path where aime-ml-containers 
 
 ```
 
-if [ -d "/home/$USER/aime-ml-containers" ] ; then
+if [ -d "/home/$USER/aime-mlc" ] ; then
 
 
-PATH="$PATH:/home/$USER/aime-ml-containers"
+PATH="$PATH:/home/$USER/aime-mlc"
 
 
 fi
@@ -557,7 +557,7 @@ More information about how to work with AIME MLCs, [here](https://www.aime.info/
 ### Uninstall AIME MLC
 
 
-In case you want to uninstall AIME MLC, juste remove the path from the .bashrc file and delete the folder where you cloned the aime-ml-containers files, in this example, /home/$USER/aime-ml-containers.
+In case you want to uninstall AIME MLC, juste remove the path from the .bashrc file and delete the folder where you cloned the aime-ml-containers files, in this example, /home/$USER/aime-mlc.
 
 
 Before that, we would recommend to remove all previous created MLCs by using mlc remove container_name.
