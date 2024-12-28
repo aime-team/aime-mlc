@@ -754,11 +754,11 @@ def print_info_header(command):
         print(
             "\n" \
             f"    {INFO_HEADER}Info{RESET}: \
-            \n    Create a new container \
+            \n    Create a new MLC container \
             \n\n    {INFO_HEADER}How to use{RESET}: \
             \n    mlc create <container_name> <framework_name> <framework_version> -w <workspace_directory> -d <data_directory> -m <models_directory> -s -arch <gpu_architecture> -ng <number of gpus> \
             \n\n    {INFO_HEADER}Example{RESET}: \
-            \n    mlc create pt231aime Pytorch 2.3.1-aime -w /home/$USER/workspace -d /data -m /home/$USER/models -s -ng 1\n" 
+            \n    mlc create pt250 Pytorch 2.5.0 -w /home/$USER/workspace -d /data -m /models\n" 
         ) 
                 
     if command == "open":
