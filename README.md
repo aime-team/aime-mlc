@@ -49,7 +49,7 @@ Pytorch, Tensorflow
 
 Available versions for NVIDIA Ada Lovelace based GPUs (RTX 4080/4090, RTX 4500/5000/6000 Ada, L40, L40S):
 
-* Pytorch: 2.4.0, 2.3.1-aime, 2.3.0, 2.2.2, 2.2.0, 2.1.2-aime, 2.1.1-aime, 2.1.0-aime, 2.1.0, 2.0.1-aime, 2.0.1, 2.0.0, 1.14.0a-nvidia, 1.13.1-aime, 1.13.0a-nvidia, 1.12.1-aime
+* Pytorch: 2.5.0, 2.4.0, 2.3.1-aime, 2.3.0, 2.2.2, 2.2.0, 2.1.2-aime, 2.1.1-aime, 2.1.0-aime, 2.1.0, 2.0.1-aime, 2.0.1, 2.0.0, 1.14.0a-nvidia, 1.13.1-aime, 1.13.0a-nvidia, 1.12.1-aime
 
 * Tensorflow: 2.16.1, 2.15.0, 2.14.0, 2.13.1-aime, 2.13.0, 2.12.0, 2.11.0-nvidia, 2.11.0-aime, 2.10.1-nvidia, 2.10.0-nvidia, 2.9.1-nvidia
 
@@ -207,7 +207,10 @@ The force option (-f) is available too.
 
 | Container Name | GPU Arch. | Build  | Pytorch  | Ubuntu Version | Python Version | Package Manager | CUDA Version | CuDNN Version | NVIDIA driver version |
 |:----------------:|:--------:|:--------:|:----------:|:----------------:|:----------------:|:-----------------:|:--------------:|:---------------:|:-----------------------:|
-| 2.4.0 | CUDA_ADA | Official | 2.4.0 | 22.04 | 3.11.9 | pip 24.0 | 12.1.105 | 9.1.0 | 530.30.02 |
+| 2.5.0 | CUDA_ADA | Official | 2.5.0 | 22.04 | 3.11.10 | conda 24.9.2 | 12.1.105 | 9.1.0 | 530.30.02 |
+| 2.5.0 | CUDA_AMPERE | Official | 2.5.0 | 22.04 | 3.11.10 | conda 24.9.2 | 11.8.89 | 9.1.0 | 520.61.05 |
+| 2.4.0 | CUDA_ADA | Official | 2.4.0 | 22.04 | 3.11.9 | conda 24.5 | 12.1.105 | 9.1.0 | 530.30.02 |
+| 2.4.0 | CUDA_AMPERE | Official | 2.4.0 | 22.04 | 3.11.9 | conda 24.5 | 11.8.89 | 9.1.0 | 520.61.05 |
 | 2.3.1-aime | CUDA_ADA | AIME | 2.3.1 | 22.04 | 3.10.12 | pip 22.0.2 | 12.1.105 | 8.9.7.29 | 530.30.02 |
 | 2.3.1-aime | CUDA_AMPERE | AIME | 2.3.1 | 22.04 | 3.10.12 | pip 22.0.2 | 11.8.87 | 8.9.6.50 | 520.61.05 |
 | 2.3.0 | CUDA_ADA | Official | 2.3.0 | 22.04 | 3.10.14 | conda 23.5.2 | 12.1.105 | 8.9.7.29 | 530.30.02 |

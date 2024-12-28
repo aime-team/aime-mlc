@@ -1124,7 +1124,7 @@ def show_frameworks_versions(ml_images_content):
     print(f"{INFO}\nAvailable frameworks and versions:{RESET}")
     for framework in frameworks:
         version_images = ml_images_content[framework]
-        print(f"{HINT}{framework}:{RESET} \n{', '.join([version[0] for version in version_images])}")
+        print(f"\n{HINT}{framework}:{RESET} \n{', '.join([version[0] for version in version_images])}")
     print(" ")
     exit(0)
 
