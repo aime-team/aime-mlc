@@ -188,7 +188,7 @@ Warning: the container will be unrecoverable deleted only data stored in the /wo
 mlc remove my-container
 ```
 
-### Update ML Containers
+### Update MLC
 
 **mlc update-sys** to update the container managment system to latest version.
 
