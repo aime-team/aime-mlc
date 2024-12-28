@@ -19,7 +19,7 @@ import re            # Regular expressions
 # Set Default values gpu architecture, AIME mlc
 DEFAULT_ARCH = 'CUDA_ADA'
 mlc_container_version = 4         # Version number of AIME MLC setup (mlc create). In version 4: data and models directories included
-mlc_version = "2.0-beta2"         # Version number of AIME MLC
+mlc_version = "2.0.0"         # Version number of AIME MLC
 
 # Obtain user and group id, user name for different tasks by create, open,...
 user_id = os.getuid()
