@@ -45,7 +45,9 @@ Available frameworks:
 
 Pytorch, Tensorflow 
 
-The following architectures are currently available: CUDA_ADA, CUDA_AMPERE, CUDA for NVIDIA GPUs and ROCM6 and ROCM5 for AMD GPUs.
+The following architectures are currently available: 
+
+CUDA_ADA, CUDA_AMPERE, CUDA for NVIDIA GPUs and ROCM6 and ROCM5 for AMD GPUs.
 
 Available versions for CUDA_ADA, which corresponds to NVIDIA Ada Lovelace based GPUs (RTX 4080/4090, RTX 4500/5000/6000 Ada, L40, L40S):
 
