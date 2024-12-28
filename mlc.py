@@ -86,7 +86,7 @@ def get_flags():
         'create',
         description= "Create a new container.",
         help='Create a new container.',
-        usage = f"\n{INPUT}mlc create <framework_name> <framework_version> <container_name>"
+        usage = f"\n{INPUT}mlc create <container_name> <framework_name> <framework_version> "
                 f"\n    -w <workspace_directory> -d <data_directory> -m <models_directory>"
                 f"\n    -s -arch <gpu_architecture> -ng <number of gpus> {RESET}", 
         formatter_class = argparse.RawTextHelpFormatter
