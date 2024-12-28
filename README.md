@@ -1,6 +1,4 @@
-# AIME MLC
-
-AIME Machine Learning Container management system.
+# AIME MLC - Machine Learning Container management system
 
 Easily install, run and manage Docker containers for Pytorch and Tensorflow deep learning frameworks.
 
@@ -47,28 +45,27 @@ Available frameworks:
 
 Pytorch, Tensorflow 
 
-Available versions for NVIDIA Ada Lovelace based GPUs (RTX 4080/4090, RTX 4500/5000/6000 Ada, L40, L40S):
+The following architectures are currently available: CUDA_ADA, CUDA_AMPERE, CUDA for NVIDIA GPUs and ROCM6 and ROCM5 for AMD GPUs.
+
+Available versions for CUDA_ADA, which corresponds to NVIDIA Ada Lovelace based GPUs (RTX 4080/4090, RTX 4500/5000/6000 Ada, L40, L40S):
 
 * Pytorch: 2.5.0, 2.4.0, 2.3.1-aime, 2.3.0, 2.2.2, 2.2.0, 2.1.2-aime, 2.1.1-aime, 2.1.0-aime, 2.1.0, 2.0.1-aime, 2.0.1, 2.0.0, 1.14.0a-nvidia, 1.13.1-aime, 1.13.0a-nvidia, 1.12.1-aime
 
 * Tensorflow: 2.16.1, 2.15.0, 2.14.0, 2.13.1-aime, 2.13.0, 2.12.0, 2.11.0-nvidia, 2.11.0-aime, 2.10.1-nvidia, 2.10.0-nvidia, 2.9.1-nvidia
 
-To print the available frameworks and corresponding versions, use:
+To print the current available gpu architectures, frameworks and corresponding versions, use:
 
 ```
 mlc create --info
 ```
 
-Example to create a container in script mode '-s' using Pytorch 2.4.0 with the name 'my-container' and with mounted user home directory as workspace, /data and /models as data and models directory, respectively, use:
+Example to create a container in script mode using Pytorch 2.4.0 with the name 'my-container' and with mounted user home directory as workspace, /data and /models as data and models directory, use:
 
 ```
-mlc create my-container Pytorch 2.4.0 -w /home/user_name/workspace -d /home/user/data -m /home/luis/models -s -arch CUDA_AMPERE
+mlc create my-container Pytorch 2.4.0 -w /home/user_name/workspace -d /data -m /models -s -arch CUDA_AMPERE
 ```
-To provide greater flexibility in selecting a GPU architecture, users can specify the desired architecture for the current container using the -arch cuda_architecture flag (default: CUDA_ADA). If a fixed architecture is preferred for an entire session, it can be set by saving the desired GPU architecture in the MLC_ARCH environment variable, for example: export MLC_ARCH=CUDA.
 
-It is important to note that the -arch flag takes precedence over the environment variable value. Similarly, if the environment variable is defined, it overrides the default architecture setting.
-
-The following architectures are currently available, listed from newest to oldest: CUDA_ADA, CUDA_AMPERE, CUDA for NVIDIA GPUs and for AMD GPUs, ROCM6 and ROCM5.
+To provide greater flexibility in selecting a GPU architecture, users can specify the desired architecture for the current container using the -arch cuda_architecture flag (default: CUDA_ADA). If a fixed architecture is preferred for an entire session, it can be set by saving the desired GPU architecture in the MLC_ARCH environment variable, for example: export MLC_ARCH=CUDA_AMPERE
 
 
 ### Open a machine learning container
