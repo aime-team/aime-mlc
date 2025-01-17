@@ -101,7 +101,7 @@ which should map to the ID and group for your user on the Docker host. Great!
 
 The container is run with the access rights of the user. To use privileged rights like for installing packages with 'apt' within the container use 'sudo'. The default is that no password is needed for sudo, to change this behaviour set a password with 'passwd'.
 
-Multiple instances of a container can be opened with mlc-open. Each instance runs in its own process.
+Multiple instances of a container can be opened with mlc open. Each instance runs in its own process.
 
 To exit an opened shell to the container type 'exit' on the command line. The last exited shell will automatically stop the container.
 

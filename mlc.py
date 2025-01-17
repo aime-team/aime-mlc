@@ -1518,10 +1518,11 @@ def main():
             workspace = "/workspace"
             data = "/data"
             models = "/models"
+            dir_to_be_added = f'/home/{user_name}/.local/bin'
             
             # Run the docker container: 
             bash_command_prepare_cmd = (
-                f"echo \"export PS1='[{validated_container_name}] `whoami`@`hostname`:\${{PWD#*}}$ '\" >> ~/.bashrc; "
+                f"echo \"export PS1='[{validated_container_name}] `whoami`@`hostname`:\${{PWD#*}}$'\" >> ~/.bashrc; "
                 "apt-get update -y > /dev/null; "
                 "apt-get install sudo git -q -y > /dev/null; "
                 f"addgroup --gid {group_id} {user_name} > /dev/null; "
@@ -1531,7 +1532,7 @@ def main():
                 f"chmod 440 /etc/sudoers.d/${user_name}_no_password; "
                 "exit"
             )
-                        
+
             docker_prepare_container = [                
                 'docker', 'run', 
                 '-v', f'{workspace_dir}:{workspace}', 
@@ -1546,7 +1547,7 @@ def main():
                 '--ipc', 'host', 
                 '--ulimit', 'memlock=-1', 
                 '--ulimit', 'stack=67108864',
-                '-v', '/tmp/.X11-unix:/tmp/.X11-unix', 
+                '-v', '/tmp/.X11-unix:/tmp/.X11-unix',
                 selected_docker_image, 
                 'bash', '-c',
                 bash_command_prepare_cmd
@@ -1580,7 +1581,8 @@ def main():
                          
             # Create but not run the final docker container with labels, user configurations and setting up volume mounts
             bash_command_create_cmd = (
-                f"echo \"export PS1='[{validated_container_name}] `whoami`@`hostname`:\${{PWD#*}}$ '\" >> ~/.bashrc; bash"
+                f"echo \"export PS1='[{validated_container_name}] `whoami`@`hostname`:\${{PWD#*}}$ '\" >> ~/.bashrc; "
+                f"echo \"export PATH='{dir_to_be_added}:$PATH'\" >> ~/.bashrc; bash"
             )
 
             docker_create_cmd = [
@@ -1611,7 +1613,8 @@ def main():
                 '--ulimit', 'stack=67108864', 
                 '-v', '/tmp/.X11-unix:/tmp/.X11-unix', 
                 '--group-add', 'video', 
-                '--group-add', 'sudo', f'{selected_docker_image}:{container_tag}', 'bash', '-c',
+                '--group-add', 'sudo', f'{selected_docker_image}:{container_tag}', 
+                'bash', '-c',
                 bash_command_create_cmd
             ]
 
