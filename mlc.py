@@ -950,7 +950,7 @@ def show_container_stats():
     # If no stdout_data is received
     if not stdout_data:
         process.terminate()
-        print(f"\n{ERROR}There are only no running containers. Start or open a container to show the stats.{RESET}\n")
+        print(f"\n{ERROR}There are no running containers. Start or open a container to show the stats.{RESET}\n")
         exit(0)
     else:        
         # Print the final processed output
