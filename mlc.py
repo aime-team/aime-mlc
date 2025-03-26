@@ -490,7 +490,7 @@ def existing_user_containers(user_name, mlc_command):
         exit(0)
 
     # Extract base names from full container names
-    container_names = [re.match(r"^(.*?)\._\.\w+$", container).group(1) for container in container_tags]
+    container_names = [re.match(r"^(.*?)(?:\._\.\w+)?$", container).group(1) for container in container_tags]
 
     return container_names, container_tags
 
