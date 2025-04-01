@@ -14,7 +14,7 @@ import json          # Handle JSON data
 import pathlib       # File system paths
 import csv           # Read/write CSV files
 import re            # Regular expressions
-
+import time          # 
 
 # Set Default values gpu architecture, AIME mlc
 DEFAULT_ARCH = 'CUDA_ADA'
@@ -854,6 +854,28 @@ def run_docker_command_popen(command):
     stderr = process.communicate()  # Communicate handles interactive input/output
     return stderr, process.returncode
 
+def run_docker_pull_image(docker_command):
+    """Pull a docker image and return its output usign subprocess.run().
+
+    Args:
+        docker_command (str): docker pull command to be executed.
+
+    """ 
+    # Run the command and print output in real-time
+    result = subprocess.run(
+        docker_command, 
+        text=True,
+        capture_output=False,  
+    )
+
+    returncode = result.returncode
+
+    if returncode == 0:
+        print(f"\n{INFO}Docker image pulled successfully!.{RESET}")
+    else:
+        print(f"\n{ERROR}Docker pull image failed. Try mlc create again.{RESET}")
+        exit (-1)
+
 
 def set_framework(framework_version_docker_sorted):
     """Display the available frameworks and set the framework by interactive selection.
@@ -1509,11 +1531,10 @@ def main():
             # Pull the required image from aime-hub: 
             print(f"\n{NEUTRAL}Acquiring container image ... {RESET}\n")
             docker_command_pull_image = ['docker', 'pull', selected_docker_image]         
-            subprocess.run(docker_command_pull_image)
+            run_docker_pull_image(docker_command_pull_image)     
         
             print(f"\n{NEUTRAL}Setting up container ... {RESET}")
-            
-             
+                         
             container_label = "aime.mlc"
             workspace = "/workspace"
             data = "/data"
@@ -2056,7 +2077,7 @@ def main():
                     exit(0)  
                 
                 # Print the update log and prompt the user to confirm update
-                print(f"\n{INFO}Update(s) available.\n\nChange Log:\n{update_log}{RESET}")
+                print(f"\n{INFO}Update(s) available.\n\nChange Log:{RESET}\n{update_log}")
                 reply = input(f"\n{INFO}Update ML container system (Y/n)?: {RESET}").strip().lower()
                 if reply in ["y", "yes", "Y", ""]:
                     args.update_directly = True  
