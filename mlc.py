@@ -14,7 +14,7 @@ import json          # Handle JSON data
 import pathlib       # File system paths
 import csv           # Read/write CSV files
 import re            # Regular expressions
-import time          # 
+
 
 # Set Default values  AIME mlc
 mlc_container_version = 4     # Version number of AIME MLC setup (mlc create). In version 4: data and models directories included
