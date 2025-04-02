@@ -16,8 +16,7 @@ import csv           # Read/write CSV files
 import re            # Regular expressions
 import time          # 
 
-# Set Default values gpu architecture, AIME mlc
-DEFAULT_ARCH = 'CUDA_ADA'
+# Set Default values  AIME mlc
 mlc_container_version = 4     # Version number of AIME MLC setup (mlc create). In version 4: data and models directories included
 mlc_version = "2.0.3"         # Version number of AIME MLC
 
@@ -437,7 +436,7 @@ def display_versions(framework, versions):
         print(f"{i}) {version}")
 
 
-def extract_from_ml_images(filename, filter_architecture=DEFAULT_ARCH):
+def extract_from_ml_images(filename, filter_architecture = None):
     """Extract the information from the file corresponding to the supported frameworks, versions, cuda architectures and docker images.
 
     Args:
@@ -447,7 +446,9 @@ def extract_from_ml_images(filename, filter_architecture=DEFAULT_ARCH):
     Returns:
         dict, list: provides a dictionary and a list of the available frameworks.
     """
-    
+    if filter_architecture is None:
+        filter_architecture = get_host_gpu_architecture()
+        
     frameworks_dict = {}
     headers = ['framework', 'version', 'architecture', 'docker image']
     separator = ";"
@@ -1192,6 +1193,53 @@ def validate_container_name(container_name, command, script=False):
                 raise ValueError(f'\n{INPUT}[{container_name}]{RESET} {ERROR}already exists. Provide a new container name.{RESET}')        
         return container_name, provided_container_tag
 
+def get_host_gpu_architecture():
+    
+    try:
+        # Run the apt command to get installed packages
+        cuda_version_command = ["apt", "list", "--installed"]
+        result = subprocess.run(cuda_version_command, capture_output=True, text=True)
+
+        if result.returncode != 0:
+            print(f"\n{ERROR}Failed to execute 'apt list --installed'.{RESET}\n", file=sys.stderr)
+            sys.exit(1)
+
+        # Manually filter lines that contain "cuda"
+        cuda_lines = "\n".join([line for line in result.stdout.split("\n") if "cuda-" in line])
+
+        # Extract the CUDA version using regex (matches cuda-X-Y or cuda-X-Y-Z)
+        match = re.search(r'cuda-(\d+\-\d+(\-\d+)?)', cuda_lines)
+
+        if not match:
+            print(f"\n{ERROR}CUDA version not found in installed packages.{RESET}\n", file=sys.stderr)
+            sys.exit(1)
+
+        # Extracted version string
+        version_str = match.group(1)  
+        
+        # Transform syntaxis (e.g. 12-3 -> 12.3)
+        transformed_version = version_str.split("-")
+        
+        # Keep only the first two parts (e.g. 12.3.1 -> 12.3)
+        host_cuda_version = float(".".join(transformed_version[:2]))  
+        
+        #version = float(simplified_version)  # Convert to float
+        #print(f"GPU CUDA version of host: {host_cuda_version}")
+        
+        # Determine CUDA architecture
+        if host_cuda_version <= 11.8:
+            return "CUDA_AMPERE"
+        elif 12.8 <= host_cuda_version:
+            return "CUDA_BLACKWELL"
+        elif 12.0 <= host_cuda_version:
+            return "CUDA_ADA"
+        else:
+            print(f"\n{ERROR}Unknown CUDA architecture{RESET}.\n", file=sys.stderr)
+            sys.exit(1)
+
+    except subprocess.CalledProcessError:
+        print(f"\n{ERROR}CUDA version not found in installed packages.{RESET}\n", file=sys.stderr)
+        sys.exit(1)
 
 
 ###############################################################################################################################################################################################
@@ -1202,8 +1250,8 @@ def main():
            
         if not args.command:
             print(f"\nUse {INPUT}mlc -h{RESET} or {INPUT}mlc --help{RESET} to get more informations about the AIME MLC tool.\n")
-              
-
+            
+   
         if args.command == 'create':
             
             # Set the file with frameworks, versions, gpu architectures and images
@@ -1214,12 +1262,14 @@ def main():
             
             #Get the existing gpu architecture    
             architectures = sorted(get_gpu_architectures(repo_file))
-
+            
             # Get the MLC_ARCH environment variable:
             mlc_repo_env_var = os.environ.get('MLC_ARCH')  
             
-            # Set the gpu architecture based on a flag, an environment variable or the default constant DEFAULT_ARCH located at the beginning of this file
-            architecture = args.architecture or mlc_repo_env_var or DEFAULT_ARCH
+            host_gpu_architecture = get_host_gpu_architecture()
+         
+            # Set the gpu architecture based on a flag, an environment variable or the gpu architecture of the host (default value detected automatically)
+            architecture = args.architecture or mlc_repo_env_var or host_gpu_architecture
             
             # Check gpu architecture
             if args.script:
