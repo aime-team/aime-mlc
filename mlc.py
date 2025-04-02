@@ -447,7 +447,7 @@ def extract_from_ml_images(filename, filter_architecture = None):
         dict, list: provides a dictionary and a list of the available frameworks.
     """
     if filter_architecture is None:
-        filter_architecture = get_host_cuda_architecture()
+        filter_architecture = get_host_gpu_architecture()
         
     frameworks_dict = {}
     headers = ['framework', 'version', 'architecture', 'docker image']
@@ -1171,7 +1171,7 @@ def validate_container_name(container_name, command, script=False):
                 raise ValueError(f'\n{INPUT}[{container_name}]{RESET} {ERROR}already exists. Provide a new container name.{RESET}')        
         return container_name, provided_container_tag
 
-def get_host_cuda_architecture():
+def get_host_gpu_architecture():
     
     try:
         # Run the apt command to get installed packages
@@ -1244,7 +1244,7 @@ def main():
             # Get the MLC_ARCH environment variable:
             mlc_repo_env_var = os.environ.get('MLC_ARCH')  
             
-            host_gpu_architecture = get_host_cuda_architecture()
+            host_gpu_architecture = get_host_gpu_architecture()
          
             # Set the gpu architecture based on a flag, an environment variable or the gpu architecture of the host (default value detected automatically)
             architecture = args.architecture or mlc_repo_env_var or host_gpu_architecture
