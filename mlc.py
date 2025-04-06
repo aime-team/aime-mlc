@@ -1193,17 +1193,67 @@ def validate_container_name(container_name, command, script=False):
                 raise ValueError(f'\n{INPUT}[{container_name}]{RESET} {ERROR}already exists. Provide a new container name.{RESET}')        
         return container_name, provided_container_tag
 
+from collections import defaultdict
+
 def get_host_gpu_architecture():
     
     try:
         # Run the apt command to get installed packages
-        cuda_version_command = ["apt", "list", "--installed"]
-        result = subprocess.run(cuda_version_command, capture_output=True, text=True)
+        cuda_version_command = [
+            "apt", 
+            "list", 
+            "--installed"
+        ]
+        apt_result = subprocess.run(cuda_version_command, capture_output=True, text=True)
 
-        if result.returncode != 0:
+        if apt_result.returncode != 0:
             print(f"\n{ERROR}Failed to execute 'apt list --installed'.{RESET}\n", file=sys.stderr)
             sys.exit(1)
 
+        apt_output = apt_result.stdout
+
+        # Group lines containing CUDA or ROCm into buckets
+        lines_by_type = defaultdict(list)
+
+        for line in apt_output.split("\n"):
+            if "cuda-" in line:
+                lines_by_type["cuda"].append(line)
+            elif "rocm" in line:
+                lines_by_type["rocm"].append(line)
+        
+        if lines_by_type["cuda"]:
+            print(f"\n{INFO}CUDA is installed. {RESET}\n", file=sys.stderr)
+            cuda_lines = "\n".join(lines_by_type["cuda"])
+            match = re.search(r'cuda-(\d+\-\d+(\-\d+)?)', cuda_lines)
+            if match:
+                version_str = match.group(1)  # e.g. '12-3-1'
+                parts = version_str.split("-")
+                host_cuda_version = float(".".join(parts[:2]))  # e.g. 12.3
+                print(f"{INFO}CUDA version: {host_cuda_version}{RESET}")
+                if host_cuda_version <= 11.8:
+                    return "CUDA_AMPERE"
+                elif 12.8 <= host_cuda_version:
+                    return "CUDA_BLACKWELL"
+                elif 12.0 <= host_cuda_version:
+                    return "CUDA_ADA"
+                else:
+                    print(f"\n{ERROR} Unknown CUDA architecture. {RESET}\n", file=sys.stderr)
+                    sys.exit(1)
+        elif lines_by_type["rocm"]:
+            print(f"\n{ERROR} ROCm is installed. {RESET}\n", file=sys.stderr)
+            rocm_lines = "\n".join(lines_by_type["rocm"])
+            match = re.search(r'rocm-dev/[^\s]+\s+(\d+\.\d+\.\d+)', rocm_lines)
+            print(f"\nROCm version: {host_cuda_version}")
+            if match:
+                version_str = match.group(1)  # e.g. '6.3.3'
+                major_version = int(version_str.split(".")[0])
+                return f"ROCM{major_version}"
+        else:
+            print(f"\n{ERROR} Neither CUDA nor ROCm found in installed apt packages. {RESET}\n")
+            exit(1)
+
+
+        """
         # Manually filter lines that contain "cuda"
         cuda_lines = "\n".join([line for line in result.stdout.split("\n") if "cuda-" in line])
 
@@ -1236,7 +1286,7 @@ def get_host_gpu_architecture():
         else:
             print(f"\n{ERROR}Unknown CUDA architecture{RESET}.\n", file=sys.stderr)
             sys.exit(1)
-
+        """
     except subprocess.CalledProcessError:
         print(f"\n{ERROR}CUDA version not found in installed packages.{RESET}\n", file=sys.stderr)
         sys.exit(1)
