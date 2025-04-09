@@ -14,7 +14,7 @@ Easily install, run and manage Docker containers for Pytorch and Tensorflow deep
 * Runs with the same performance as a bare metal installation
 * Repository of all major deep learning framework versions as containers
 * (New): create and configure containers in interactive mode
-* (New): GPU architecture switchable by flag or an enviroment variable
+* (New): GPU architecture switchable by flag or an environment variable
 
 ## Installation
 
@@ -67,7 +67,7 @@ Example to create a container in script mode using Pytorch 2.4.0 with the name '
 mlc create my-container Pytorch 2.4.0 -w /home/user_name/workspace -d /data -m /models -s -arch CUDA_AMPERE
 ```
 
-To provide greater flexibility in selecting a GPU architecture, users can specify the desired architecture for the current container using the -arch cuda_architecture flag (default: CUDA_ADA). If a fixed architecture is preferred for an entire session, it can be set by saving the desired GPU architecture in the MLC_ARCH environment variable, for example: export MLC_ARCH=CUDA_AMPERE
+To provide greater flexibility in selecting a GPU architecture, users can specify the desired architecture for the current container using the -arch cuda_architecture flag (default: host gpu architecture, auto-detected). If a fixed architecture is preferred for an entire session, it can be set by saving the desired GPU architecture in the MLC_ARCH environment variable, for example: export MLC_ARCH=CUDA_AMPERE
 
 
 ### Open a machine learning container

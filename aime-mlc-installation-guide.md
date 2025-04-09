@@ -463,7 +463,7 @@ mkdir /home/$USER/workspace
 ```
 
 
-Now we clone the aime-ml-containers from AIME's [Github](https://github.com/aime-team/aime-mlc) web site, selecting the most appropriate branch for your installed GPU, on the location you prefer. The recommended location would be somewhere where you don't need sudo rights, e.g. within the home directory:
+Now we clone the aime-mlc from AIME's [Github](https://github.com/aime-team/aime-mlc) web site, selecting the most appropriate branch for your installed GPU, on the location you prefer. The recommended location would be somewhere where you don't need sudo rights, e.g. within the home directory:
 
 
 ```
@@ -491,11 +491,11 @@ AIME offers solutions for the AIME MLCs depending on the model of the GPU, NVIDI
 - ROCM5: for AMD ROCM 5.0 supported GPUs
 
 
-Users can specify the desired architecture for the current container using the -arch cuda_architecture flag (default: CUDA_ADA). If a fixed architecture is preferred for an entire session, it can be set by saving the desired GPU architecture in the MLC_ARCH environment variable using, for example: export MLC_ARCH=CUDA.
+Users can specify the desired architecture for the current container using the -arch cuda_architecture flag (default: host gpu architecture, auto-detected). If a fixed architecture is preferred for an entire session, it can be set by saving the desired GPU architecture in the MLC_ARCH environment variable using, for example: export MLC_ARCH=CUDA.
 
 It is important to note that the -arch flag takes precedence over the environment variable value. Similarly, if the environment variable is defined, it overrides the default architecture setting.
 
-The next step is to add in /home/user/.bashrc the path where aime-ml-containers was cloned to, in the above example /home/$USER/aime-ml-containers, adding the following at the end of .bashrc:
+The next step is to add in /home/user/.bashrc the path where aime-mlc was cloned to, in the above example /home/$USER/aime-mlc, adding the following at the end of .bashrc:
 
 
 ```
@@ -557,7 +557,7 @@ More information about how to work with AIME MLCs, [here](https://www.aime.info/
 ### Uninstall AIME MLC
 
 
-In case you want to uninstall AIME MLC, juste remove the path from the .bashrc file and delete the folder where you cloned the aime-ml-containers files, in this example, /home/$USER/aime-mlc.
+In case you want to uninstall AIME MLC, juste remove the path from the .bashrc file and delete the folder where you cloned the aime-mlc files, in this example, /home/$USER/aime-mlc.
 
 
 Before that, we would recommend to remove all previous created MLCs by using mlc remove container_name.

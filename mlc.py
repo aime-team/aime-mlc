@@ -15,6 +15,7 @@ import pathlib       # File system paths
 import csv           # Read/write CSV files
 import re            # Regular expressions
 
+from collections import defaultdict
 
 # Set Default values  AIME mlc
 mlc_container_version = 4     # Version number of AIME MLC setup (mlc create). In version 4: data and models directories included
@@ -112,7 +113,7 @@ def get_flags():
         '-arch', '--architecture', 
         type=str,
         metavar='', 
-        help=f"Set the gpu architecture to be used. Default: CUDA_ADA."
+        help=f"Set the gpu architecture to be used. Default: host gpu architecture (auto-detected)."
              f"\nThere are 2 options to change the default value:"
              f"\n  1.-using the -arch flag."  
              f"\n  2.-adding the environment variable MLC_ARCH, with export MLC_ARCH=gpu_arch."
@@ -447,7 +448,7 @@ def extract_from_ml_images(filename, filter_architecture = None):
         dict, list: provides a dictionary and a list of the available frameworks.
     """
     if filter_architecture is None:
-        filter_architecture = get_host_gpu_architecture()
+        _, filter_architecture, _ = get_host_gpu_architecture()
         
     frameworks_dict = {}
     headers = ['framework', 'version', 'architecture', 'docker image']
@@ -875,7 +876,7 @@ def run_docker_pull_image(docker_command):
         print(f"\n{INFO}Docker image pulled successfully!.{RESET}")
     else:
         print(f"\n{ERROR}Docker pull image failed. Try mlc create again.{RESET}")
-        exit (-1)
+        exit(1)
 
 
 def set_framework(framework_version_docker_sorted):
@@ -1193,8 +1194,6 @@ def validate_container_name(container_name, command, script=False):
                 raise ValueError(f'\n{INPUT}[{container_name}]{RESET} {ERROR}already exists. Provide a new container name.{RESET}')        
         return container_name, provided_container_tag
 
-from collections import defaultdict
-
 def get_host_gpu_architecture():
     
     try:
@@ -1207,12 +1206,12 @@ def get_host_gpu_architecture():
         apt_result = subprocess.run(cuda_version_command, capture_output=True, text=True)
 
         if apt_result.returncode != 0:
-            print(f"\n{ERROR}Failed to execute 'apt list --installed'.{RESET}\n", file=sys.stderr)
-            sys.exit(1)
+            print(f"\n{ERROR}Host GPU architecture detection: Failed to execute 'apt list --installed'.{RESET}\n")
+            exit(1)
 
         apt_output = apt_result.stdout
 
-        # Group lines containing CUDA or ROCm into buckets
+        # Group lines containing CUDA or ROCm into buckets. Every new key starts with an empty list
         lines_by_type = defaultdict(list)
 
         for line in apt_output.split("\n"):
@@ -1222,74 +1221,47 @@ def get_host_gpu_architecture():
                 lines_by_type["rocm"].append(line)
         
         if lines_by_type["cuda"]:
-            print(f"\n{INFO}CUDA is installed. {RESET}\n", file=sys.stderr)
             cuda_lines = "\n".join(lines_by_type["cuda"])
             match = re.search(r'cuda-(\d+\-\d+(\-\d+)?)', cuda_lines)
+            
             if match:
                 version_str = match.group(1)  # e.g. '12-3-1'
                 parts = version_str.split("-")
                 host_cuda_version = float(".".join(parts[:2]))  # e.g. 12.3
-                print(f"{INFO}CUDA version: {host_cuda_version}{RESET}")
+                
                 if host_cuda_version <= 11.8:
-                    return "CUDA_AMPERE"
+                    return "CUDA", "CUDA_AMPERE", host_cuda_version
                 elif 12.8 <= host_cuda_version:
-                    return "CUDA_BLACKWELL"
+                    return "CUDA", "CUDA_BLACKWELL", host_cuda_version
                 elif 12.0 <= host_cuda_version:
-                    return "CUDA_ADA"
+                    return "CUDA", "CUDA_ADA", host_cuda_version
                 else:
-                    print(f"\n{ERROR} Unknown CUDA architecture. {RESET}\n", file=sys.stderr)
-                    sys.exit(1)
+                    print(f"\n{ERROR}Unknown CUDA architecture. {RESET}\n")
+                    exit(1)
+            else:
+                print(f"\n{ERROR}CUDA driver version not found. {RESET}\n")
+                exit(1)               
+                    
         elif lines_by_type["rocm"]:
-            print(f"\n{ERROR} ROCm is installed. {RESET}\n", file=sys.stderr)
             rocm_lines = "\n".join(lines_by_type["rocm"])
             match = re.search(r'rocm-dev/[^\s]+\s+(\d+\.\d+\.\d+)', rocm_lines)
-            print(f"\nROCm version: {host_cuda_version}")
+            
             if match:
                 version_str = match.group(1)  # e.g. '6.3.3'
-                major_version = int(version_str.split(".")[0])
-                return f"ROCM{major_version}"
+                host_rocm_version = int(version_str.split(".")[0])
+                return "ROCM", f"ROCM{host_rocm_version}", version_str 
+            else:
+                print(f"\n{ERROR}ROCm driver version not found. {RESET}\n")
+                exit(1)  
         else:
-            print(f"\n{ERROR} Neither CUDA nor ROCm found in installed apt packages. {RESET}\n")
+            print(f"\n{ERROR}Neither CUDA nor ROCm were found among the installed APT packages. {RESET}\n")
             exit(1)
 
+    
+    except Exception as e:
+        print(f"\n{ERROR}Failed to detect host GPU architecture.{RESET}\n")
+        exit(1)  
 
-        """
-        # Manually filter lines that contain "cuda"
-        cuda_lines = "\n".join([line for line in result.stdout.split("\n") if "cuda-" in line])
-
-        # Extract the CUDA version using regex (matches cuda-X-Y or cuda-X-Y-Z)
-        match = re.search(r'cuda-(\d+\-\d+(\-\d+)?)', cuda_lines)
-
-        if not match:
-            print(f"\n{ERROR}CUDA version not found in installed packages.{RESET}\n", file=sys.stderr)
-            sys.exit(1)
-
-        # Extracted version string
-        version_str = match.group(1)  
-        
-        # Transform syntaxis (e.g. 12-3 -> 12.3)
-        transformed_version = version_str.split("-")
-        
-        # Keep only the first two parts (e.g. 12.3.1 -> 12.3)
-        host_cuda_version = float(".".join(transformed_version[:2]))  
-        
-        #version = float(simplified_version)  # Convert to float
-        #print(f"GPU CUDA version of host: {host_cuda_version}")
-        
-        # Determine CUDA architecture
-        if host_cuda_version <= 11.8:
-            return "CUDA_AMPERE"
-        elif 12.8 <= host_cuda_version:
-            return "CUDA_BLACKWELL"
-        elif 12.0 <= host_cuda_version:
-            return "CUDA_ADA"
-        else:
-            print(f"\n{ERROR}Unknown CUDA architecture{RESET}.\n", file=sys.stderr)
-            sys.exit(1)
-        """
-    except subprocess.CalledProcessError:
-        print(f"\n{ERROR}CUDA version not found in installed packages.{RESET}\n", file=sys.stderr)
-        sys.exit(1)
 
 
 ###############################################################################################################################################################################################
@@ -1316,22 +1288,23 @@ def main():
             # Get the MLC_ARCH environment variable:
             mlc_repo_env_var = os.environ.get('MLC_ARCH')  
             
-            host_gpu_architecture = get_host_gpu_architecture()
+            cuda_or_rocm, host_gpu_architecture, gpu_driver_version = get_host_gpu_architecture()
          
             # Set the gpu architecture based on a flag, an environment variable or the gpu architecture of the host (default value detected automatically)
             architecture = args.architecture or mlc_repo_env_var or host_gpu_architecture
+            available_host_gpu_architectures = [architecture for architecture in architectures if cuda_or_rocm in architecture]
             
             # Check gpu architecture
             if args.script:
-                if architecture not in architectures:
-                    print(f"\n{ERROR}Unknown gpu architecture:{RESET} {INPUT}{architecture}{RESET} \n\n{INFO}Available gpu architectures:{RESET}\n{', '.join(architectures)}\n")
+                if architecture not in available_host_gpu_architectures:
+                    print(f"\n{ERROR}Unknown gpu architecture:{RESET} {INPUT}{architecture}{RESET} \n\n{INFO}Available gpu architectures:{RESET}\n{', '.join(available_host_gpu_architectures)}\n")
                     exit(1)
             else:
-                while architecture not in architectures:
+                while architecture not in available_host_gpu_architectures:
                     print(f"\n{ERROR}Unknown gpu architecture:{RESET} {INPUT}{architecture}{RESET}")
-                    display_gpu_architectures(architectures)
-                    architecture_number = get_user_selection(f"{REQUEST}Enter the number of the desired architecture: {RESET}", len(architectures))
-                    architecture = architectures[architecture_number - 1]            
+                    display_gpu_architectures(available_host_gpu_architectures)
+                    architecture_number = get_user_selection(f"{REQUEST}Enter the number of the desired architecture: {RESET}", len(available_host_gpu_architectures))
+                    architecture = available_host_gpu_architectures[architecture_number - 1]            
             
             # Extract framework, version and docker image from the ml_images.repo file
             framework_version_docker = extract_from_ml_images(repo_file, architecture)
@@ -1339,7 +1312,7 @@ def main():
             
             # Check if the user requests more info about available gpu architecture, framework and version 
             if args.info:
-                print(f"\n{INFO}Available gpu architectures ({INPUT}currently used{RESET}{INFO}):{RESET}\n" + ', '.join(f"{INPUT}{arch}{RESET}" if arch == architecture else arch for arch in architectures))
+                print(f"\n{INFO}Available gpu architectures ({INPUT}currently used{RESET}{INFO}):{RESET}\n" + ', '.join(f"{INPUT}{arch}{RESET}" if arch == architecture else arch for arch in available_host_gpu_architectures))
                 show_frameworks_versions(framework_version_docker_sorted)
                 
             # List existing containers/container_tags of the current user
@@ -1602,7 +1575,7 @@ def main():
             set_up_summary = (
                 f"\n{INFO_HEADER}{'_'*50}{RESET}"   
                 f"\n{INFO_HEADER}Summary of the selected setup:{RESET}"
-                f"\nGPU architecture: {INPUT}{architecture}{RESET}"
+                f"\nGPU architecture: {INPUT}{architecture}{RESET} (host: {host_gpu_architecture}-{gpu_driver_version})"
                 f"\nContainer name: {INPUT}{validated_container_name}{RESET}"
                 f"\nFramework and Version: {INPUT}{selected_framework} {selected_version}{RESET}"
                 f"\nWorkspace directory: {INPUT}{workspace_dir}{RESET}"
