@@ -669,29 +669,7 @@ def get_container_name(container_name, user_name, command, script=False):
                 print(e)
     else:
         return validate_container_name(container_name, command, script) 
-        
-    """
-    if container_name:                
-        while True:
-            try:                 
-                return validate_container_name(container_name, command, script)            
-            except ValueError as e:
-                print(e)
-                container_name = input(f"\n{REQUEST}Enter a container name (valid characters: a-z, A-Z, 0-9, _,-,#): {RESET}")                
-    else:
-        if script:
-            print(f"\n{ERROR}Container name is missing.{RESET}\n")
-            exit(1)
-        else:
-            while True:                           
-                container_name = input(f"\n{REQUEST}Enter a container name (valid characters: a-z, A-Z, 0-9, _,-,#): {RESET}")
-                try:
-                    return validate_container_name(container_name, command, script)
-                except ValueError as e:
-                    print(e)         
-    """
-
-
+    
 
 def get_docker_image(version, images):
     """Get the docker image corresponding to the provided version.
@@ -713,6 +691,88 @@ def get_docker_image(version, images):
         
     # Raise an exception if no matching tuple is found              
     raise ValueError("No version available") 
+
+
+def get_host_gpu_architecture():
+    """Detects the GPU architecture (CUDA or ROCm) installed on the host system.
+
+    This function uses the `apt list --installed` command to inspect installed packages
+    and determine whether a CUDA or ROCm driver is present. It extracts the version 
+    information and maps it to a specific GPU architecture string.
+
+    Returns:
+        tuple: A tuple containing:
+            - The detected driver type ('CUDA' or 'ROCM')
+            - The corresponding architecture string (e.g., 'CUDA_AMPERE', 'ROCM6')
+            - The version number (float for CUDA, string for ROCm)
+
+    """    
+    
+    try:
+        # Run the apt command to get installed packages
+        cuda_version_command = [
+            "apt", 
+            "list", 
+            "--installed"
+        ]
+        apt_result = subprocess.run(cuda_version_command, capture_output=True, text=True)
+
+        if apt_result.returncode != 0:
+            print(f"\n{ERROR}Host GPU architecture detection: Failed to execute 'apt list --installed'.{RESET}\n")
+            exit(1)
+
+        apt_output = apt_result.stdout
+
+        # Group lines containing CUDA or ROCm into buckets. Every new key starts with an empty list
+        lines_by_type = defaultdict(list)
+
+        for line in apt_output.split("\n"):
+            if "cuda-" in line:
+                lines_by_type["cuda"].append(line)
+            elif "rocm" in line:
+                lines_by_type["rocm"].append(line)
+        
+        if lines_by_type["cuda"]:
+            cuda_lines = "\n".join(lines_by_type["cuda"])
+            match = re.search(r'cuda-(\d+\-\d+(\-\d+)?)', cuda_lines)
+            
+            if match:
+                version_str = match.group(1)  # e.g. '12-3-1'
+                parts = version_str.split("-")
+                host_cuda_version = float(".".join(parts[:2]))  # e.g. 12.3
+                
+                if host_cuda_version <= 11.8:
+                    return "CUDA", "CUDA_AMPERE", host_cuda_version
+                elif 12.8 <= host_cuda_version:
+                    return "CUDA", "CUDA_BLACKWELL", host_cuda_version
+                elif 12.0 <= host_cuda_version:
+                    return "CUDA", "CUDA_ADA", host_cuda_version
+                else:
+                    print(f"\n{ERROR}Unknown CUDA architecture. {RESET}\n")
+                    exit(1)
+            else:
+                print(f"\n{ERROR}CUDA driver version not found. {RESET}\n")
+                exit(1)               
+                    
+        elif lines_by_type["rocm"]:
+            rocm_lines = "\n".join(lines_by_type["rocm"])
+            match = re.search(r'rocm-dev/[^\s]+\s+(\d+\.\d+\.\d+)', rocm_lines)
+            
+            if match:
+                version_str = match.group(1)  # e.g. '6.3.3'
+                host_rocm_version = int(version_str.split(".")[0])
+                return "ROCM", f"ROCM{host_rocm_version}", version_str 
+            else:
+                print(f"\n{ERROR}ROCm driver version not found. {RESET}\n")
+                exit(1)  
+        else:
+            print(f"\n{ERROR}Neither CUDA nor ROCm were found among the installed APT packages. {RESET}\n")
+            exit(1)
+
+    
+    except Exception as e:
+        print(f"\n{ERROR}Failed to detect host GPU architecture.{RESET}\n")
+        exit(1)  
 
 
 def is_container_active(container_name):
@@ -1152,6 +1212,7 @@ def show_frameworks_versions(ml_images_content):
     print(" ")
     exit(0)
 
+
 def validate_container_name(container_name, command, script=False):
     """Validate the container name provided by the user
 
@@ -1194,75 +1255,237 @@ def validate_container_name(container_name, command, script=False):
                 raise ValueError(f'\n{INPUT}[{container_name}]{RESET} {ERROR}already exists. Provide a new container name.{RESET}')        
         return container_name, provided_container_tag
 
-def get_host_gpu_architecture():
+
+def build_docker_run_command(    
+        architecture, 
+        workspace_dir, 
+        workspace, 
+        container_tag,
+        num_gpus, 
+        selected_docker_image, 
+        validated_container_name,
+        user_name, 
+        user_id, 
+        group_id
+    ):
+    """Constructs a 'docker run' command based on the host GPU architecture and user setup.
+
+    This function assembles the appropriate `docker run` command with volume mappings,
+    user configurations, GPU-specific options (for CUDA or ROCm), and an embedded
+    bash script for setting up the container environment.
+
+    Args:
+        architecture (str): GPU architecture type (e.g., 'CUDA', 'ROCM').
+        workspace_dir (str): Path on the host to be mounted into the container.
+        workspace (str): Path inside the container where the workspace will be mounted.
+        container_tag (str): Tag to assign to the running container.
+        num_gpus (str): Number of GPUs to allocate (used only for CUDA).
+        selected_docker_image (str): Base Docker image to use.
+        validated_container_name (str): Display name used in the bash prompt inside the container.
+        user_name (str): Username to be created inside the container.
+        user_id (int): User ID to assign.
+        group_id (int): Group ID to assign.
+
+    Returns:
+        list: A list representing the full Docker command to run in subprocess or shell.
+
+    Raises:
+        ValueError: If the provided architecture is not supported ('CUDA' or 'ROCM').
+    """
     
-    try:
-        # Run the apt command to get installed packages
-        cuda_version_command = [
-            "apt", 
-            "list", 
-            "--installed"
+    # Shared base command
+    base_docker_cmd = [
+        'docker', 'run',
+        '-v', f'{workspace_dir}:{workspace}',
+        '-w', workspace,
+        '--name', container_tag,
+        '--tty',
+        '--privileged',
+        '--network', 'host',
+        '--device', '/dev/snd',
+        '--ipc', 'host',
+        '--ulimit', 'memlock=-1',
+        '--ulimit', 'stack=67108864',
+        '-v', '/tmp/.X11-unix:/tmp/.X11-unix',
+    ]
+
+    cuda_extras = [
+        '--gpus', num_gpus,
+        '--device', '/dev/video0',
+    ]
+
+    rocm_extras = [
+        '-u', 'root',
+        '--device', '/dev/kfd',
+        '--device', '/dev/dri',
+        '--cap-add', 'SYS_PTRACE',
+        '--security-opt', 'seccomp=unconfined',
+        '--shm-size', '8G'
+    ]
+
+    # Shared bash command part
+    bash_lines = [
+        f"echo \"export PS1='[{validated_container_name}] `whoami`@`hostname`:\${{PWD#*}}$'\" >> ~/.bashrc;",
+        "apt-get update -y > /dev/null;",
+        "apt-get install sudo git -q -y > /dev/null;",
+        f"addgroup --gid {group_id} {user_name} > /dev/null;",
+        f"adduser --uid {user_id} --gid {group_id} {user_name} --disabled-password --gecos aime > /dev/null;",
+        f"passwd -d {user_name};",
+        f"echo \"{user_name} ALL=(ALL) NOPASSWD: ALL\" > /etc/sudoers.d/{user_name}_no_password;",
+    ]
+
+    # Add ROCm-specific line if needed
+    if 'ROCM' in architecture:
+        bash_lines.append(f"echo \"export ROCM_PATH=/opt/rocm\" >> ~/.bashrc;")
+
+    bash_lines.extend([
+        f"chmod 440 /etc/sudoers.d/${user_name}_no_password;",
+        "exit"
+    ])      
+
+    bash_command = ' '.join(bash_lines)
+
+    # Assemble full command
+    if 'CUDA' in architecture:
+        docker_cmd = base_docker_cmd + cuda_extras + [
+            f'{selected_docker_image}:{container_tag}', 'bash', '-c', bash_command
         ]
-        apt_result = subprocess.run(cuda_version_command, capture_output=True, text=True)
+    elif 'ROCM' in architecture:
+        docker_cmd = base_docker_cmd + rocm_extras + [
+            selected_docker_image, 'bash', '-c', bash_command
+        ]
+    else:
+        raise ValueError(f"Unsupported architecture: {architecture}")
 
-        if apt_result.returncode != 0:
-            print(f"\n{ERROR}Host GPU architecture detection: Failed to execute 'apt list --installed'.{RESET}\n")
-            exit(1)
+    return docker_cmd
 
-        apt_output = apt_result.stdout
+def build_docker_create_command(
+        user_name, 
+        user_id, 
+        group_id,   
+        architecture,
+        selected_docker_image,
+        selected_framework,
+        selected_version,
+        mlc_container_version,
+        validated_container_name,
+        container_label,
+        container_tag,
+        workspace,
+        workspace_dir, 
+        data_dir,
+        models_dir,
+        dir_to_be_added,
+        num_gpus,
+        volumes                
+    ):
+    """Constructs a 'docker create' command customized for a machine learning container environment.
 
-        # Group lines containing CUDA or ROCm into buckets. Every new key starts with an empty list
-        lines_by_type = defaultdict(list)
+    This function prepares a Docker container creation command with appropriate flags, volume
+    mounts, GPU-specific configurations (CUDA or ROCm), and user-specific labels. It embeds a bash
+    startup sequence that configures the shell prompt, environment paths, and device permissions.
 
-        for line in apt_output.split("\n"):
-            if "cuda-" in line:
-                lines_by_type["cuda"].append(line)
-            elif "rocm" in line:
-                lines_by_type["rocm"].append(line)
-        
-        if lines_by_type["cuda"]:
-            cuda_lines = "\n".join(lines_by_type["cuda"])
-            match = re.search(r'cuda-(\d+\-\d+(\-\d+)?)', cuda_lines)
-            
-            if match:
-                version_str = match.group(1)  # e.g. '12-3-1'
-                parts = version_str.split("-")
-                host_cuda_version = float(".".join(parts[:2]))  # e.g. 12.3
-                
-                if host_cuda_version <= 11.8:
-                    return "CUDA", "CUDA_AMPERE", host_cuda_version
-                elif 12.8 <= host_cuda_version:
-                    return "CUDA", "CUDA_BLACKWELL", host_cuda_version
-                elif 12.0 <= host_cuda_version:
-                    return "CUDA", "CUDA_ADA", host_cuda_version
-                else:
-                    print(f"\n{ERROR}Unknown CUDA architecture. {RESET}\n")
-                    exit(1)
-            else:
-                print(f"\n{ERROR}CUDA driver version not found. {RESET}\n")
-                exit(1)               
-                    
-        elif lines_by_type["rocm"]:
-            rocm_lines = "\n".join(lines_by_type["rocm"])
-            match = re.search(r'rocm-dev/[^\s]+\s+(\d+\.\d+\.\d+)', rocm_lines)
-            
-            if match:
-                version_str = match.group(1)  # e.g. '6.3.3'
-                host_rocm_version = int(version_str.split(".")[0])
-                return "ROCM", f"ROCM{host_rocm_version}", version_str 
-            else:
-                print(f"\n{ERROR}ROCm driver version not found. {RESET}\n")
-                exit(1)  
-        else:
-            print(f"\n{ERROR}Neither CUDA nor ROCm were found among the installed APT packages. {RESET}\n")
-            exit(1)
+    Args:
+        user_name (str): Name of the user to be created inside the container.
+        user_id (int): User ID to assign.
+        group_id (int): Group ID to assign.
+        architecture (str): Target GPU architecture ('CUDA' or 'ROCM').
+        selected_docker_image (str): Base Docker image name.
+        selected_framework (str): Deep learning framework (e.g., 'tensorflow', 'pytorch').
+        selected_version (str): Version of the framework.
+        mlc_container_version (str): Version identifier for the container environment.
+        validated_container_name (str): Checked name for bash prompt.
+        container_label (str): Label to add to the container.
+        container_tag (str): Tag to assign to the container.
+        workspace (str): Path inside the container where the workspace will be mounted.
+        workspace_dir (str): Host path for the workspace.
+        data_dir (str): Host path for the dataset directory.
+        models_dir (str): Host path for the models directory.
+        dir_to_be_added (str): Directory path to add to the container's PATH.
+        num_gpus (str): Number of GPUs to assign (used with CUDA).
+        volumes (list): Additional volume mount strings to include.
 
+    Returns:
+        list: A list representing the full 'docker create' command.
+
+    Raises:
+        ValueError: If the provided architecture is not supported.
+    """
     
-    except Exception as e:
-        print(f"\n{ERROR}Failed to detect host GPU architecture.{RESET}\n")
-        exit(1)  
+    # Shared base command
+    base_docker_cmd = [
+        'docker', 'create',
+        '-it',
+        '-w', workspace,
+        '--name', container_tag,
+        '--label', f'{container_label}={user_name}',
+        '--label', f'{container_label}.NAME={validated_container_name}',
+        '--label', f'{container_label}.USER={user_name}',
+        '--label', f'{container_label}.ARCH={architecture}',
+        '--label', f'{container_label}.MLC_VERSION={mlc_container_version}',
+        '--label', f'{container_label}.WORK_MOUNT={workspace_dir}',
+        '--label', f'{container_label}.DATA_MOUNT={data_dir}',
+        '--label', f'{container_label}.MODELS_MOUNT={models_dir}',
+        '--label', f'{container_label}.FRAMEWORK={selected_framework}-{selected_version}',
+        '--label', f'{container_label}.GPUS={num_gpus}',
+        '--user', f'{user_id}:{group_id}',
+        '--tty',
+        '--privileged',
+        '--interactive',
+        '--network', 'host',
+        '--device', '/dev/snd',
+        '--ipc', 'host',
+        '--ulimit', 'memlock=-1',
+        '--ulimit', 'stack=67108864',
+        '-v', '/tmp/.X11-unix:/tmp/.X11-unix',
+        '--group-add', 'video'
+    ]   
+    
+    # Insert the volumes list at the correct position, after '-it'
+    base_docker_cmd[3:3] = volumes    
+       
+    cuda_extras = [
+        '--gpus', num_gpus,
+        '--device', '/dev/video0',
+        '--group-add', 'sudo'
+    ]
 
+    rocm_extras = [
+        '--device', '/dev/kfd',
+        '--device', '/dev/dri',
+        '--cap-add', 'SYS_PTRACE',
+        '--security-opt', 'seccomp=unconfined',
+        '--shm-size', '8G',
+        '--group-add', 'sudo'
+    ]
+    
+    # Shared bash command part
+    bash_lines = [
+        f"echo \"export PS1='[{validated_container_name}] `whoami`@`hostname`:\${{PWD#*}}$ '\" >> ~/.bashrc;",
+        f"echo \"export PATH='{dir_to_be_added}:$PATH'\" >> ~/.bashrc;"
+    ]
+    
+    # Add ROCm-specific line if needed
+    if 'ROCM' in architecture:
+        bash_lines.append("sudo chown root:video /dev/kfd; sudo chown -R root:video /dev/dri;")
+    
+    bash_lines.append("bash")
+    
+    bash_command = ' '.join(bash_lines)
 
+    # Assemble full command
+    if 'CUDA' in architecture:
+        docker_cmd = base_docker_cmd + cuda_extras + [
+            f'{selected_docker_image}:{container_tag}', 'bash', '-c', bash_command
+        ]
+    elif 'ROCM' in architecture:
+        docker_cmd = base_docker_cmd + rocm_extras + [
+            f'{selected_docker_image}:{container_tag}', 'bash', '-c', bash_command
+        ]
+    else:
+        raise ValueError(f"Unsupported architecture: {architecture}")
+
+    return docker_cmd
 
 ###############################################################################################################################################################################################
 def main():
@@ -1288,7 +1511,7 @@ def main():
             # Get the MLC_ARCH environment variable:
             mlc_repo_env_var = os.environ.get('MLC_ARCH')  
             
-            cuda_or_rocm, host_gpu_architecture, gpu_driver_version = get_host_gpu_architecture()
+            cuda_or_rocm, host_gpu_architecture, host_gpu_driver_version = get_host_gpu_architecture()
          
             # Set the gpu architecture based on a flag, an environment variable or the gpu architecture of the host (default value detected automatically)
             architecture = args.architecture or mlc_repo_env_var or host_gpu_architecture
@@ -1575,7 +1798,7 @@ def main():
             set_up_summary = (
                 f"\n{INFO_HEADER}{'_'*50}{RESET}"   
                 f"\n{INFO_HEADER}Summary of the selected setup:{RESET}"
-                f"\nGPU architecture: {INPUT}{architecture}{RESET} (host: {host_gpu_architecture}-{gpu_driver_version})"
+                f"\nGPU architecture: {INPUT}{architecture}{RESET} (host: {host_gpu_architecture}-{host_gpu_driver_version})"
                 f"\nContainer name: {INPUT}{validated_container_name}{RESET}"
                 f"\nFramework and Version: {INPUT}{selected_framework} {selected_version}{RESET}"
                 f"\nWorkspace directory: {INPUT}{workspace_dir}{RESET}"
@@ -1613,40 +1836,21 @@ def main():
             data = "/data"
             models = "/models"
             dir_to_be_added = f'/home/{user_name}/.local/bin'
-            
-            # Run the docker container: 
-            bash_command_prepare_cmd = (
-                f"echo \"export PS1='[{validated_container_name}] `whoami`@`hostname`:\${{PWD#*}}$'\" >> ~/.bashrc; "
-                "apt-get update -y > /dev/null; "
-                "apt-get install sudo git -q -y > /dev/null; "
-                f"addgroup --gid {group_id} {user_name} > /dev/null; "
-                f"adduser --uid {user_id} --gid {group_id} {user_name} --disabled-password --gecos aime > /dev/null; "
-                f"passwd -d {user_name}; "
-                f"echo \"{user_name} ALL=(ALL) NOPASSWD: ALL\" > /etc/sudoers.d/{user_name}_no_password; "
-                f"chmod 440 /etc/sudoers.d/${user_name}_no_password; "
-                "exit"
-            )
 
-            docker_prepare_container = [                
-                'docker', 'run', 
-                '-v', f'{workspace_dir}:{workspace}', 
-                '-w', workspace,
-                '--name', container_tag, 
-                '--tty', 
-                '--privileged', 
-                '--gpus', args.num_gpus,
-                '--network', 'host', 
-                '--device', '/dev/video0', 
-                '--device', '/dev/snd',
-                '--ipc', 'host', 
-                '--ulimit', 'memlock=-1', 
-                '--ulimit', 'stack=67108864',
-                '-v', '/tmp/.X11-unix:/tmp/.X11-unix',
-                selected_docker_image, 
-                'bash', '-c',
-                bash_command_prepare_cmd
-            ]
-      
+            # Generating the Docker command for running
+            docker_prepare_container = build_docker_run_command(
+                architecture,
+                workspace_dir,
+                workspace,
+                container_tag,
+                args.num_gpus,
+                selected_docker_image,
+                validated_container_name,
+                user_name,
+                user_id,
+                group_id
+            )
+            
             # ToDo: compare subprocess.Popen with subprocess.run  
             result_run_cmd = subprocess.run(docker_prepare_container, capture_output=True, text=True )
 
@@ -1658,7 +1862,7 @@ def main():
             # ToDo: capture possible errors and treat them  
             result_commit = subprocess.run(bash_command_commit, capture_output=True, text=True)
             
-            # Remove the container: cleans up the initial container to free up resources.
+            # Remove the container: cleans up the initial container to free up ressources.
             # ToDo: compare subprocess.Popen with subprocess.run  
             result_remove = subprocess.run(['docker', 'rm', container_tag], capture_output=True, text=True)
             
@@ -1672,49 +1876,28 @@ def main():
             # Add the models volume mapping if models_dir is set
             if models_dir != default_models_dir:
                 volumes +=  ['-v', f'{models_dir}:{models}'] 
-                         
-            # Create but not run the final docker container with labels, user configurations and setting up volume mounts
-            bash_command_create_cmd = (
-                f"echo \"export PS1='[{validated_container_name}] `whoami`@`hostname`:\${{PWD#*}}$ '\" >> ~/.bashrc; "
-                f"echo \"export PATH='{dir_to_be_added}:$PATH'\" >> ~/.bashrc; bash"
+                
+            docker_create_cmd = build_docker_create_command(
+                user_name, 
+                user_id, 
+                group_id,   
+                architecture,
+                selected_docker_image,
+                selected_framework,
+                selected_version,
+                mlc_container_version,
+                validated_container_name,
+                container_label,
+                container_tag,
+                workspace,
+                workspace_dir, 
+                data_dir,
+                models_dir,
+                dir_to_be_added,
+                args.num_gpus,
+                volumes 
             )
-
-            docker_create_cmd = [
-                'docker', 'create', 
-                '-it', 
-                '-w', workspace, 
-                '--name', container_tag,
-                '--label', f'{container_label}={user_name}', 
-                '--label', f'{container_label}.NAME={validated_container_name}',
-                '--label', f'{container_label}.USER={user_name}',
-                '--label', f'{container_label}.ARCH={architecture}', 
-                '--label', f'{container_label}.MLC_VERSION={mlc_container_version}',
-                '--label', f'{container_label}.WORK_MOUNT={workspace_dir}', 
-                '--label', f'{container_label}.DATA_MOUNT={data_dir}',
-                '--label', f'{container_label}.MODELS_MOUNT={models_dir}',                          
-                '--label', f'{container_label}.FRAMEWORK={selected_framework}-{selected_version}', 
-                '--label', f'{container_label}.GPUS={args.num_gpus}',
-                '--user', f'{user_id}:{group_id}', 
-                '--tty', 
-                '--privileged', 
-                '--interactive', 
-                '--gpus', args.num_gpus,
-                '--network', 'host', 
-                '--device', '/dev/video0', 
-                '--device', '/dev/snd', 
-                '--ipc', 'host',
-                '--ulimit', 'memlock=-1', 
-                '--ulimit', 'stack=67108864', 
-                '-v', '/tmp/.X11-unix:/tmp/.X11-unix', 
-                '--group-add', 'video', 
-                '--group-add', 'sudo', f'{selected_docker_image}:{container_tag}', 
-                'bash', '-c',
-                bash_command_create_cmd
-            ]
-
-            # Insert the volumes list at the correct position, after '-it'
-            docker_create_cmd[3:3] = volumes       
-
+            
             # ToDo: compare subprocess.Popen with subprocess.run  
             result_create_cmd = subprocess.run(docker_create_cmd, capture_output= True, text=True)
             
