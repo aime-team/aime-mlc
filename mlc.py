@@ -1325,7 +1325,7 @@ def build_docker_run_command(
 
     # Shared bash command part
     bash_lines = [
-        f"echo \"export PS1='[{validated_container_name}] `whoami`@`hostname`:\${{PWD#*}}$'\" >> ~/.bashrc;",
+        f"echo \"export PS1='[{validated_container_name}] `whoami`@`hostname`:\\${{PWD#*}}$'\" >> ~/.bashrc;",
         "apt-get update -y > /dev/null;",
         "apt-get install sudo git -q -y > /dev/null;",
         f"addgroup --gid {group_id} {user_name} > /dev/null;",
@@ -1461,7 +1461,7 @@ def build_docker_create_command(
     
     # Shared bash command part
     bash_lines = [
-        f"echo \"export PS1='[{validated_container_name}] `whoami`@`hostname`:\${{PWD#*}}$ '\" >> ~/.bashrc;",
+        f"echo \"export PS1='[{validated_container_name}] `whoami`@`hostname`:\\${{PWD#*}}$ '\" >> ~/.bashrc;",
         f"echo \"export PATH='{dir_to_be_added}:$PATH'\" >> ~/.bashrc;"
     ]
     
