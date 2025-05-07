@@ -2334,7 +2334,7 @@ def main():
                 
                 # Print the update log and prompt the user to confirm update
                 print(f"\n{INFO}Update(s) available.\n\nChange Log:{RESET}\n{update_log}")
-                reply = input(f"\n{INFO}Update ML container system (Y/n)?: {RESET}").strip().lower()
+                reply = input(f"\n{REQUEST}Update ML container system (Y/n)?: {RESET}").strip().lower()
                 if reply in ["y", "yes", "Y", ""]:
                     args.update_directly = True  
                 else:
