@@ -1348,7 +1348,7 @@ def build_docker_run_command(
     # Assemble full command
     if 'CUDA' in architecture:
         docker_cmd = base_docker_cmd + cuda_extras + [
-            f'{selected_docker_image}:{container_tag}', 'bash', '-c', bash_command
+            f'{selected_docker_image}', 'bash', '-c', bash_command
         ]
     elif 'ROCM' in architecture:
         docker_cmd = base_docker_cmd + rocm_extras + [
@@ -1900,7 +1900,7 @@ def main():
             
             # ToDo: compare subprocess.Popen with subprocess.run  
             result_create_cmd = subprocess.run(docker_create_cmd, capture_output= True, text=True)
-            
+
             print(f"\n{INPUT}[{validated_container_name}]{RESET} ready.{INFO}\n\nOpen the container with:{RESET}\nmlc open {INPUT}{validated_container_name}{RESET}\n")
 
                      
