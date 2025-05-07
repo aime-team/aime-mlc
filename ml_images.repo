@@ -1,3 +1,5 @@
+Pytorch, 2.7.0, [CUDA_ADA], aimehub/pytorch-2.7.0-aime-cuda12.6.0  
+Pytorch, 2.7.0, [CUDA_AMPERE], aimehub/pytorch-2.7.0-aime-cuda11.8.0
 Pytorch, 2.6.0, [CUDA_ADA], aimehub/pytorch-2.6.0-aime-cuda12.4.1
 Pytorch, 2.6.0, [CUDA_AMPERE], aimehub/pytorch-2.6.0-aime-cuda11.8.0
 Pytorch, 2.6.0, [ROCM6], aimehub/pytorch-2.6.0-rocm6.2
