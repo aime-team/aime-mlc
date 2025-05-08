@@ -47,11 +47,11 @@ Pytorch, Tensorflow
 
 The following architectures are currently available: 
 
-CUDA_ADA, CUDA_AMPERE, CUDA for NVIDIA GPUs and ROCM6 and ROCM5 for AMD GPUs.
+CUDA_BLACKWELL, CUDA_ADA, CUDA_AMPERE, CUDA for NVIDIA GPUs and ROCM6 and ROCM5 for AMD GPUs.
 
 Available versions for CUDA_ADA, which corresponds to NVIDIA Ada Lovelace based GPUs (RTX 4080/4090, RTX 4500/5000/6000 Ada, L40, L40S):
 
-* Pytorch: 2.6.0, 2.5.1, 2.5.0, 2.4.0, 2.3.1-aime, 2.3.0, 2.2.2, 2.2.0, 2.1.2-aime, 2.1.1-aime, 2.1.0-aime, 2.1.0, 2.0.1-aime, 2.0.1, 2.0.0, 1.14.0a-nvidia, 1.13.1-aime, 1.13.0a-nvidia, 1.12.1-aime
+* Pytorch: 2.7.0, 2.7.0-aime, 2.6.0, 2.5.1, 2.5.0, 2.4.0, 2.3.1-aime, 2.3.0, 2.2.2, 2.2.0, 2.1.2-aime, 2.1.1-aime, 2.1.0-aime, 2.1.0, 2.0.1-aime, 2.0.1, 2.0.0, 1.14.0a-nvidia, 1.13.1-aime, 1.13.0a-nvidia, 1.12.1-aime
 
 * Tensorflow: 2.16.1, 2.15.0, 2.14.0, 2.13.1-aime, 2.13.0, 2.12.0, 2.11.0-nvidia, 2.11.0-aime, 2.10.1-nvidia, 2.10.0-nvidia, 2.9.1-nvidia
 
