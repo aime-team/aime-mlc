@@ -1462,7 +1462,7 @@ def build_docker_create_command(
     # Shared bash command part
     bash_lines = [
         f"echo \"export PS1='[{validated_container_name}] `whoami`@`hostname`:\\${{PWD#*}}$ '\" >> ~/.bashrc;",
-        f"echo \"export PATH='{dir_to_be_added}:$PATH'\" >> ~/.bashrc;"
+        f'echo "export PATH=\\"{dir_to_be_added}:\\$PATH\\"" >> ~/.bashrc;'
     ]
     
     # Add ROCm-specific line if needed
