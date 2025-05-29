@@ -19,7 +19,7 @@ from collections import defaultdict
 
 # Set Default values  AIME mlc
 mlc_container_version = 4     # Version number of AIME MLC setup (mlc create). In version 4: data and models directories included
-mlc_version = "2.1.1"         # Version number of AIME MLC
+mlc_version = "2.1.2"         # Version number of AIME MLC
 
 # Obtain user and group id, user name for different tasks by create, open,...
 user_id = os.getuid()
@@ -735,6 +735,8 @@ def get_host_gpu_architecture():
         if lines_by_type["cuda"]:
             cuda_lines = "\n".join(lines_by_type["cuda"])
             match = re.search(r'cuda-(\d+\-\d+(\-\d+)?)', cuda_lines)
+            if not match:
+                match = re.search(r'cuda-toolkit-(\d+\-\d+(\-\d+)?)', cuda_lines)
             
             if match:
                 version_str = match.group(1)  # e.g. '12-3-1'
