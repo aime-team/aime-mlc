@@ -49,9 +49,9 @@ The following architectures are currently available:
 
 CUDA_BLACKWELL, CUDA_ADA, CUDA_AMPERE, CUDA for NVIDIA GPUs and ROCM6 and ROCM5 for AMD GPUs.
 
-Available versions for CUDA_ADA, which corresponds to NVIDIA Ada Lovelace based GPUs (RTX 4080/4090, RTX 4500/5000/6000 Ada, L40, L40S):
+Available versions for CUDA_BLACKWELL, which corresponds to NVIDIA Blackwell based GPUS (RTX 5090, RTX PRO 6000 Blackwell Workstation Edition, H100, H200):
 
-* Pytorch: 2.7.0, 2.7.0-aime, 2.6.0, 2.5.1, 2.5.0, 2.4.0, 2.3.1-aime, 2.3.0, 2.2.2, 2.2.0, 2.1.2-aime, 2.1.1-aime, 2.1.0-aime, 2.1.0, 2.0.1-aime, 2.0.1, 2.0.0, 1.14.0a-nvidia, 1.13.1-aime, 1.13.0a-nvidia, 1.12.1-aime
+* Pytorch: 2.7.1, 2.7.1-aime, 2.7.0, 2.7.0-aime, 2.6.0, 2.5.1, 2.5.0, 2.4.0, 2.3.1-aime, 2.3.0, 2.2.2, 2.2.0, 2.1.2-aime, 2.1.1-aime, 2.1.0-aime, 2.1.0, 2.0.1-aime, 2.0.1, 2.0.0, 1.14.0a-nvidia, 1.13.1-aime, 1.13.0a-nvidia, 1.12.1-aime
 
 * Tensorflow: 2.16.1, 2.15.0, 2.14.0, 2.13.1-aime, 2.13.0, 2.12.0, 2.11.0-nvidia, 2.11.0-aime, 2.10.1-nvidia, 2.10.0-nvidia, 2.9.1-nvidia
 
@@ -204,8 +204,21 @@ The force option (-f) is available too.
 
 ### Pytorch Containers
 
-| Container Name | GPU Arch. | Build  | Pytorch  | Ubuntu Version | Python Version | Package Manager | CUDA Version | CuDNN Version | NVIDIA driver version |
+| Container Name | GPU Arch. | Build | Pytorch | Ubuntu Version | Python Version | Package Manager | CUDA/ROCM Version | CuDNN/MIOpen Version | NVIDIA/ROCM driver version |
 |:----------------:|:--------:|:--------:|:----------:|:----------------:|:----------------:|:-----------------:|:--------------:|:---------------:|:-----------------------:|
+| 2.7.1-aime | CUDA_BLACKWELL | AIME | 2.7.1 | 24.04 | 3.12.3 | pip 24.0 | 12.8.93 | 9.7.1.26 | 570.124.06 |
+| 2.7.1 | CUDA_BLACKWELL | Official | 2.7.1 | 22.04 | 3.11.13 | conda 25.5.0 | 12.8.61 | 9.7.1.26 | 570.86.10 |
+| 2.7.1-aime | CUDA_ADA | AIME | 2.7.1 | 22.04 | 3.10.12 | pip 22.0.2 | 12.6.20 | 9.5.1.17 | 560.28.03 |
+| 2.7.1 | CUDA_ADA | Official | 2.7.1 | 22.04 | 3.11.13 | conda 25.5.0 | 12.6.85 | 9.5.1.17 | 560.35.05 |
+| 2.7.1-aime | CUDA_AMPERE | AIME | 2.7.1 | 22.04 | 3.10.12 | pip 22.0.2 | 11.8.89 | 9.1.0.70 | 520.61.05 |
+| 2.7.1 | CUDA_AMPERE | Official | 2.7.1 | 22.04 | 3.11.13 | conda 25.5.0 | 11.8.89 | 9.1.0.70 | 520.61.05 |
+| 2.7.0-aime | CUDA_BLACKWELL | AIME | 2.7.0 | 24.04 | 3.12.3 | pip 24.0 | 12.8.93 | 9.7.1.26 | 570.124.06 |
+| 2.7.0 | CUDA_BLACKWELL | Official | 2.7.0 | 22.04 | 3.11.12 | conda 25.3.1 | 12.8.61 | 9.7.1.26 | 570.86.10 |
+| 2.7.0-aime | CUDA_ADA | AIME | 2.7.0 | 22.04 | 3.10.12 | pip 22.0.2 | 12.6.20 | 9.5.1.17 | 560.28.03 |
+| 2.7.0 | CUDA_ADA | Official | 2.7.0 | 22.04 | 3.11.12 | conda 25.3.1 | 12.6.85 | 9.5.1.17 | 560.35.05 |
+| 2.7.0-aime | CUDA_AMPERE | AIME | 2.7.0 | 22.04 | 3.10.12 | pip 22.0.2 | 11.8.89 | 9.1.0.70 | 520.61.05 |
+| 2.7.0 | CUDA_AMPERE | Official | 2.7.0 | 22.04 | 3.11.12 | conda 25.3.1 | 11.8.89 | 9.1.0.70 | 520.61.05 |
+| 2.6.0 | ROCM6 | Official | 2.6.0 | 22.04 | 3.10.12 | pip 22.0.2 | 6.2.2 | 3.2.0 | 6.10.5 |
 | 2.6.0 | CUDA_ADA | AIME | 2.6.0 | 22.04 | 3.10.12 | pip 22.0.2 | 12.4.131 | 9.1.0.70 | 550.54.15 |
 | 2.6.0 | CUDA_AMPERE | AIME | 2.6.0 | 22.04 | 3.10.12 | pip 22.0.2 | 11.8.89 | 8.9.6.50 | 520.61.05 |
 | 2.5.1 | CUDA_ADA | AIME | 2.5.1 | 22.04 | 3.10.12 | pip 22.0.2 | 12.1.105 | 8.9.0.131 | 530.30.02 |
