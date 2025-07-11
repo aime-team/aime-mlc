@@ -43,17 +43,23 @@ Create a new machine learning container
 
 Available frameworks:
 
-Pytorch, Tensorflow 
+**Pytorch**, **Tensorflow**
 
 The following architectures are currently available: 
 
-CUDA_BLACKWELL, CUDA_ADA, CUDA_AMPERE, CUDA for NVIDIA GPUs and ROCM6 and ROCM5 for AMD GPUs.
+**CUDA_BLACKWELL**: NVIDIA RTX 50x0, RTX PRO 5000/6000 Blackwell
 
-Available versions for CUDA_BLACKWELL, which corresponds to NVIDIA Blackwell based GPUS (RTX 5090, RTX PRO 6000 Blackwell Workstation Edition, H100, H200):
+**CUDA_ADA**: NVIDIA RTX 40x0, RTX 5000/6000 Ada, L40, H100, H200
 
-* Pytorch: 2.7.1, 2.7.1-aime, 2.7.0, 2.7.0-aime, 2.6.0, 2.5.1, 2.5.0, 2.4.0, 2.3.1-aime, 2.3.0, 2.2.2, 2.2.0, 2.1.2-aime, 2.1.1-aime, 2.1.0-aime, 2.1.0, 2.0.1-aime, 2.0.1, 2.0.0, 1.14.0a-nvidia, 1.13.1-aime, 1.13.0a-nvidia, 1.12.1-aime
+**CUDA_AMPERE**: NVIDIA RTX 30x0, RTX A5000/A6000, A100
 
-* Tensorflow: 2.16.1, 2.15.0, 2.14.0, 2.13.1-aime, 2.13.0, 2.12.0, 2.11.0-nvidia, 2.11.0-aime, 2.10.1-nvidia, 2.10.0-nvidia, 2.9.1-nvidia
+**CUDA**: NVIDIA GTX 1080TI, RTX 2080TI, Titan RTX, Quadro 5000/6000, Tesla V100
+
+**ROCM6**: AMD RX 7900, RX 9070, MI210, MI250X, MI300X, MI325X
+
+**ROCM5**: AMD Radeon VII, MI100
+
+Frameworks of later version will be mostly supported by the previous GPU generations if the installed driver on the host system doe support the required CUDA/ROCM version. Frameworks compiled for older GPU architectures are not compatible to newer GPU generations.
 
 To print the current available gpu architectures, frameworks and corresponding versions, use:
 
@@ -61,10 +67,27 @@ To print the current available gpu architectures, frameworks and corresponding v
 mlc create --info
 ```
 
+For CUDA_ADA architecutre it will output:
+
+```
+Available gpu architectures (currently used):
+CUDA, *CUDA_ADA*, CUDA_AMPERE, CUDA_BLACKWELL
+
+Available frameworks and versions:
+
+Pytorch:
+2.7.0-aime, 2.7.0, 2.6.0, 2.5.1, 2.5.0, 2.4.0, 2.3.1-aime, 2.3.0, 2.2.2, 2.2.0, 2.1.2-aime, 2.1.1-aime, 2.1.0-aime, 2.1.0,
+2.0.1-aime, 2.0.1, 2.0.0, 1.14.0a-nvidia, 1.13.1-aime, 1.13.0a-nvidia, 1.12.1-aime
+
+Tensorflow:
+2.16.1, 2.15.0, 2.14.0, 2.13.1-aime, 2.13.0, 2.12.0, 2.11.0-nvidia, 2.11.0-aime, 2.10.1-nvidia, 2.10.0-nvidia, 2.9.1-nvidia
+```
+
+
 Example to create a container in script mode using Pytorch 2.4.0 with the name 'my-container' and with mounted user home directory as workspace, /data and /models as data and models directory, use:
 
 ```
-mlc create my-container Pytorch 2.4.0 -w /home/user_name/workspace -d /data -m /models -s -arch CUDA_AMPERE
+mlc create my-container Pytorch 2.6.0 -w /home/user_name/workspace -d /data -m /models -s -arch CUDA_AMPERE
 ```
 
 To provide greater flexibility in selecting a GPU architecture, users can specify the desired architecture for the current container using the -arch cuda_architecture flag (default: host gpu architecture, auto-detected). If a fixed architecture is preferred for an entire session, it can be set by saving the desired GPU architecture in the MLC_ARCH environment variable, for example: export MLC_ARCH=CUDA_AMPERE
