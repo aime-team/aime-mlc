@@ -67,7 +67,7 @@ To print the current available gpu architectures, frameworks and corresponding v
 mlc create --info
 ```
 
-For CUDA_ADA architecutre it will output:
+For CUDA_ADA architecture it will output:
 
 ```
 Available gpu architectures (currently used):
