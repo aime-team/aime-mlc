@@ -246,8 +246,8 @@ def get_flags():
     # Parser for the "start" command
     parser_start = subparsers.add_parser(
         'start', 
-        usage = f"\n{INPUT}mlc start [-s|--script]{RESET}",
-        description= "Start an existing and no running container.",
+        usage = f"\n{INPUT}mlc start [execute command] [-d|--detach] [-s|--script]{RESET}",
+        description= "Start an existing and not running container and execute the given command in the container.",
         help="Start an existing and no running container."
     )
     parser_start.add_argument(
@@ -255,6 +255,17 @@ def get_flags():
         nargs = '?', 
         type=str, 
         help="Name of the container to be started."
+    )
+    parser_start.add_argument(
+        'execute_command', 
+        nargs='?', 
+        type=str, 
+        help='Command to execute incontainer when started sucessful'
+    )
+    parser_start.add_argument(
+        '-d', '--detach', 
+        action='store_true', 
+        help="Suppress output of executed command and start detached (default: show output)."
     )
     parser_start.add_argument(
         '-s', '--script', 
@@ -853,7 +864,7 @@ def print_info_header(command):
             f"    {INFO_HEADER}Info{RESET}: \
             \n    Start an existing machine learning container  \
             \n\n    {INFO_HEADER}How to use{RESET}: \
-            \n    mlc start <container_name> [-s|--script] \
+            \n    mlc start <container_name> [execute_command] [-d|--detach] [-s|--script] \
             \n\n    {INFO_HEADER}Example{RESET}: \
             \n    mlc start pt231aime -s\n"
         )
@@ -938,7 +949,7 @@ def run_docker_pull_image(docker_command):
         print(f"\n{INFO}Docker image pulled successfully.{RESET}")
     else:
         print(f"\n{ERROR}Docker pull image failed. Try mlc create again.{RESET}")
-        exit(1)
+    #    exit(1)
 
 
 def set_framework(framework_version_docker_sorted):
@@ -1256,6 +1267,17 @@ def validate_container_name(container_name, command, script=False):
             else:
                 raise ValueError(f'\n{INPUT}[{container_name}]{RESET} {ERROR}already exists. Provide a new container name.{RESET}')        
         return container_name, provided_container_tag
+
+
+def get_docker_env():                 
+    # Set environment variables to pass to the Docker container
+    set_env = f"-e DISPLAY={os.environ.get('DISPLAY')}"
+    
+    # If the NCCL_P2P_LEVEL environment variable is set, include it in the environment settings
+    if 'NCCL_P2P_LEVEL' in os.environ:
+        set_env += f" -e NCCL_P2P_LEVEL={os.environ.get('NCCL_P2P_LEVEL')}"   
+
+    return set_env
 
 
 def build_docker_run_command(    
@@ -1953,13 +1975,8 @@ def main():
                 print(f"\n{INPUT}[{selected_container_name}]{RESET} {NEUTRAL}container already running.{RESET}")
                 
             print(f"\n{INPUT}[{selected_container_name}]{RESET} {NEUTRAL}opening shell to container...{RESET}")
-                             
-            # Set environment variables to pass to the Docker container
-            set_env = f"-e DISPLAY={os.environ.get('DISPLAY')}"
-            
-            # If the NCCL_P2P_LEVEL environment variable is set, include it in the environment settings
-            if 'NCCL_P2P_LEVEL' in os.environ:
-                set_env += f" -e NCCL_P2P_LEVEL={os.environ.get('NCCL_P2P_LEVEL')}"   
+
+            set_env = get_docker_env()
 
             # Open an interactive shell session in the running container as the current user
             docker_command_open_shell=[
@@ -2118,13 +2135,8 @@ def main():
                     exit(0)
                 
                 if args.container_name in running_containers:                    
-                    if args.script:                         
-                        print(f"\n{INPUT}[{args.container_name}]{RESET} {ERROR}exists and is running. Not possible to be started.{RESET}\n")
-                        exit(1)                        
-                    else:                        
-                        print(f"\n{INPUT}[{args.container_name}]{RESET} {ERROR}exists and is running. Not possible to be started.{RESET}")                        
-                        print(f"\n{INFO}The following no running containers of the current user can be started:{RESET} ")
-                        selected_container_name, selected_container_position = select_container_to_be_ed(no_running_containers) 
+                    print(f"\n{INPUT}[{args.container_name}]{RESET} {ERROR}Can not be started, container is already running.{RESET}\n")
+                    exit(1)                        
                                               
                 elif args.container_name in no_running_containers:
                     selected_container_name = args.container_name
@@ -2143,7 +2155,7 @@ def main():
                         while True:                            
                             print(f"\n{INFO}The following no running containers of the current user can be started:{RESET} ")
                             selected_container_name, selected_container_position = select_container_to_be_ed(no_running_containers) 
-                            break                                          
+                            break                                    
             else:             
                 if no_running_container_number == 0:
                     print(
@@ -2179,14 +2191,33 @@ def main():
                     text=True,
                     stdout=subprocess.PIPE, 
                 )
-                # Communicate handles interactive input/output
-                stdout, _ = process.communicate()  
-                out = stdout.strip()
-                exit_code = process.returncode
-                if out == selected_container_tag:
-                    print(f"\n{INPUT}[{selected_container_name}]{RESET} {NEUTRAL}container started.{RESET}\n\n{INFO}To open a shell within the container, use:{RESET} \nmlc open {INPUT}{selected_container_name}{RESET}\n")
+
+                set_env = get_docker_env()
+
+                if args.execute_command:
+                    show_output = '-t'
+                    if(args.detach):
+                        show_output = '-d'
+
+                    ## Execute Command!
+                    docker_command_open_shell=[
+                        "docker", "exec", 
+                        show_output,       
+                        set_env,  
+                        "--user", f"{user_id}:{group_id}", f"{selected_container_tag}",                   
+                        args.execute_command  
+                    ]
+
+                #ToDo: capture possible errors and treat them
+                error_mesage, exit_code = run_docker_command_popen(docker_command_open_shell)
+                
+                if exit_code == 0 or exit_code == 1:            
+                    print(f"\n{INPUT}[{selected_container_name}]{RESET} {NEUTRAL}container started.{RESET}")
                 else:
-                    print(f"\n{INPUT}[{selected_container_name}]{RESET} {ERROR}error starting container.{RESET}")
+                    print(f"\n{INPUT}[{selected_container_name}]{RESET} {ERROR}error starting container, stopping container...{RESET}")
+                    docker_command_stop_container = f"docker container stop {selected_container_tag}"
+                    _, _, _ = run_docker_command(docker_command_stop_container)
+                
             else:                
                 print(f"\n{INPUT}[{selected_container_name}]{RESET} {NEUTRAL}container already running.{RESET}\n")
                 exit(0)
@@ -2357,7 +2388,7 @@ def main():
                 exit(-1)  
 
     except KeyboardInterrupt:
-        print(f"\n{ERROR}\nRunning process cancelled by the user.{RESET}\n")
+        print(f"\n{ERROR}\nRunning process exited by the user.{RESET}\n")
         exit(1)
    
              
