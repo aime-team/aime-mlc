@@ -2127,17 +2127,9 @@ def main():
             )           
             
             if args.container_name: 
-                if no_running_container_number == 0:                    
-                    print(
-                        f"{ERROR}\nAt the moment all containers are running.\nCreate a new one and start it using:{RESET}\n{HINT}mlc start container_name{RESET}"
-                    )
-                    show_container_info() 
-                    exit(0)
-                
                 if args.container_name in running_containers:                    
                     print(f"\n{INPUT}[{args.container_name}]{RESET} {ERROR}Can not be started, container is already running.{RESET}\n")
-                    exit(1)                        
-                                              
+                    exit(1)                                                                      
                 elif args.container_name in no_running_containers:
                     selected_container_name = args.container_name
                     selected_container_position = no_running_containers.index(args.container_name) + 1
