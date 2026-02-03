@@ -19,7 +19,7 @@ from collections import defaultdict
 
 # Set Default values  AIME mlc
 mlc_container_version = 4     # Version number of AIME MLC setup (mlc create). In version 4: data and models directories included
-mlc_version = "2.1.2"         # Version number of AIME MLC
+mlc_version = "2.2.0"         # Version number of AIME MLC
 
 # Obtain user and group id, user name for different tasks by create, open,...
 user_id = os.getuid()
