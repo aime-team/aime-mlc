@@ -1,3 +1,4 @@
+Pytorch, 2.10.0-aime, [CUDA_BLACKWELL], aimehub/pytorch-2.10.0-aime-cuda12.9.1
 Pytorch, 2.9.1-cu130-aime, [CUDA_BLACKWELL], aimehub/pytorch-2.9.1-aime-cuda13.0.2
 Pytorch, 2.9.1-aime, [CUDA_BLACKWELL], aimehub/pytorch-2.9.1-aime-cuda12.9.1
 Pytorch, 2.9.1, [CUDA_BLACKWELL], aimehub/pytorch-2.9.1-cuda12.8.1
