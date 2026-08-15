@@ -1,3 +1,5 @@
+Pytorch, 2.13.0-cu132-aime, [CUDA_BLACKWELL], aimehub/pytorch-2.13.0-aime-cuda13.2.1
+Pytorch, 2.13.0-aime, [CUDA_BLACKWELL], aimehub/pytorch-2.13.0-aime-cuda13.0.3
 Pytorch, 2.12.1-cu132-aime, [CUDA_BLACKWELL], aimehub/pytorch-2.12.1-aime-cuda13.2.1
 Pytorch, 2.12.0-cu132-aime, [CUDA_BLACKWELL], aimehub/pytorch-2.12.0-aime-cuda13.2.1
 Pytorch, 2.12.0-aime, [CUDA_BLACKWELL], aimehub/pytorch-2.12.0-aime-cuda13.0.2
