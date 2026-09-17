@@ -1350,7 +1350,7 @@ def build_docker_run_command(
 
     # Shared bash command part
     bash_lines = [
-        f'echo "export PATH=\\"{dir_to_be_added}:\\$PATH\\"" >> /etc/skel/.bashrc;'
+        f'echo "export PATH=\\"{dir_to_be_added}:\\$PATH\\"" >> /etc/bash.bashrc;'
         f"echo \"export PS1='[{validated_container_name}] \\$(whoami)@\\$(hostname):\\${{PWD#*}}$ '\" >> /etc/skel/.bashrc;",
         "apt-get update -y > /dev/null;",
         "apt-get install sudo git -q -y > /dev/null;",
@@ -1365,7 +1365,7 @@ def build_docker_run_command(
         bash_lines.append(f"echo \"export ROCM_PATH=/opt/rocm\" >> ~/.bashrc;")
 
     bash_lines.extend([
-        f"chmod 440 /etc/sudoers.d/${user_name}_no_password;",
+        f"chmod 440 /etc/sudoers.d/{user_name}_no_password;",
         "exit"
     ])      
 
