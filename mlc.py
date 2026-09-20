@@ -14,7 +14,6 @@ import json          # Handle JSON data
 import pathlib       # File system paths
 import csv           # Read/write CSV files
 import re            # Regular expressions
-import pwd
 
 from collections import defaultdict
 
@@ -24,7 +23,7 @@ mlc_version = "2.2.0"         # Version number of AIME MLC
 
 # Obtain user and group id, user name for different tasks by create, open,...
 user_id = os.getuid()
-user_name = pwd.getpwuid(user_id).pw_name
+user_name = os.getlogin()
 group_id = os.getgid()      
 
 # Coloring the frontend (ANSI escape codes) and i/o 
@@ -1352,41 +1351,22 @@ def build_docker_run_command(
 
     # Shared bash command part
     bash_lines = [
-        f'echo "export PATH=\\"{dir_to_be_added}:\\$PATH\\"" >> /etc/bash.bashrc;',
+        f'echo "export PATH=\\"{dir_to_be_added}:\\$PATH\\"" >> /etc/skel/.bashrc;',
         f"echo \"export PS1='[{validated_container_name}] \\$(whoami)@\\$(hostname):\\${{PWD#*}}$ '\" >> /etc/skel/.bashrc;",
         "apt-get update -y > /dev/null;",
         "apt-get install sudo git -q -y > /dev/null;",
 
-        # Allow pip to modify Ubuntu's externally-managed Python environment.
-        "printf '[global]\\nbreak-system-packages = true\\n' > /etc/pip.conf;",
-
         f"""
         set -e
 
+        # delete existing user if already exists with host user_id
         existing_user="$(getent passwd {user_id} | cut -d: -f1 || true)"
-        existing_group="$(getent group {group_id} | cut -d: -f1 || true)"
-
         if [ -n "$existing_user" ]; then
-            if [ "$existing_user" != "{user_name}" ]; then
-                usermod -l "{user_name}" "$existing_user"
-            fi
-
-            usermod -g "{group_id}" "{user_name}" 2>/dev/null || true
-        else
-            if [ -z "$existing_group" ]; then
-                groupadd --gid "{group_id}" "{user_name}"
-            fi
-
-            useradd \
-                --uid "{user_id}" \
-                --gid "{group_id}" \
-                --create-home \
-                --shell /bin/bash \
-                "{user_name}"
+            userdel -r "$(id -nu {user_id})"
         fi
-
-        usermod -d "/home/{user_name}" -m "{user_name}" 2>/dev/null || true
-        chown -R {user_id}:{group_id} "/home/{user_name}"
+   
+        groupadd --gid "{group_id}" "{user_name}"
+        useradd --uid "{user_id}" --gid "{group_id}" --create-home --shell /bin/bash "{user_name}"
         """,
 
         f"passwd -d {user_name};",
