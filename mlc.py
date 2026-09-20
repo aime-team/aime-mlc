@@ -1321,6 +1321,7 @@ def build_docker_run_command(
     # Shared base command
     base_docker_cmd = [
         'docker', 'run',
+        '--user', 'root',
         '-v', f'{workspace_dir}:{workspace}',
         '-w', workspace,
         '--name', container_tag,
@@ -1350,12 +1351,24 @@ def build_docker_run_command(
 
     # Shared bash command part
     bash_lines = [
-        f'echo "export PATH=\\"{dir_to_be_added}:\\$PATH\\"" >> /etc/bash.bashrc;'
+        f'echo "export PATH=\\"{dir_to_be_added}:\\$PATH\\"" >> /etc/skel/.bashrc;',
         f"echo \"export PS1='[{validated_container_name}] \\$(whoami)@\\$(hostname):\\${{PWD#*}}$ '\" >> /etc/skel/.bashrc;",
         "apt-get update -y > /dev/null;",
         "apt-get install sudo git -q -y > /dev/null;",
-        f"addgroup --gid {group_id} {user_name} > /dev/null;",
-        f"adduser --uid {user_id} --gid {group_id} {user_name} --disabled-password --gecos aime > /dev/null;",
+
+        f"""
+        set -e
+
+        # delete existing user if already exists with host user_id
+        existing_user="$(getent passwd {user_id} | cut -d: -f1 || true)"
+        if [ -n "$existing_user" ]; then
+            userdel -r "$(id -nu {user_id})"
+        fi
+   
+        groupadd --gid "{group_id}" "{user_name}"
+        useradd --uid "{user_id}" --gid "{group_id}" --create-home --shell /bin/bash "{user_name}"
+        """,
+
         f"passwd -d {user_name};",
         f"echo \"{user_name} ALL=(ALL) NOPASSWD: ALL\" > /etc/sudoers.d/{user_name}_no_password;",
     ]
@@ -2386,6 +2399,3 @@ def main():
              
 if __name__ == '__main__':
     main()
-
-    
-    
